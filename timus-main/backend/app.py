@@ -1,0 +1,298 @@
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+import yfinance as yf
+
+app = Flask(__name__)
+CORS(app)
+
+# Curated list of real, actively-traded tickers used for autocomplete search.
+# Covers S&P 500 large-caps, popular tech, financials, healthcare, energy, etc.
+TICKER_LIST = [
+    {"ticker": "AAPL",  "name": "Apple Inc."},
+    {"ticker": "MSFT",  "name": "Microsoft Corporation"},
+    {"ticker": "GOOGL", "name": "Alphabet Inc. (Class A)"},
+    {"ticker": "GOOG",  "name": "Alphabet Inc. (Class C)"},
+    {"ticker": "AMZN",  "name": "Amazon.com Inc."},
+    {"ticker": "NVDA",  "name": "NVIDIA Corporation"},
+    {"ticker": "META",  "name": "Meta Platforms Inc."},
+    {"ticker": "TSLA",  "name": "Tesla Inc."},
+    {"ticker": "BRK-B", "name": "Berkshire Hathaway Inc."},
+    {"ticker": "JPM",   "name": "JPMorgan Chase & Co."},
+    {"ticker": "V",     "name": "Visa Inc."},
+    {"ticker": "UNH",   "name": "UnitedHealth Group Inc."},
+    {"ticker": "LLY",   "name": "Eli Lilly and Company"},
+    {"ticker": "JNJ",   "name": "Johnson & Johnson"},
+    {"ticker": "XOM",   "name": "Exxon Mobil Corporation"},
+    {"ticker": "WMT",   "name": "Walmart Inc."},
+    {"ticker": "MA",    "name": "Mastercard Incorporated"},
+    {"ticker": "PG",    "name": "Procter & Gamble Co."},
+    {"ticker": "AVGO",  "name": "Broadcom Inc."},
+    {"ticker": "HD",    "name": "The Home Depot Inc."},
+    {"ticker": "CVX",   "name": "Chevron Corporation"},
+    {"ticker": "ABBV",  "name": "AbbVie Inc."},
+    {"ticker": "MRK",   "name": "Merck & Co. Inc."},
+    {"ticker": "COST",  "name": "Costco Wholesale Corporation"},
+    {"ticker": "KO",    "name": "The Coca-Cola Company"},
+    {"ticker": "BAC",   "name": "Bank of America Corporation"},
+    {"ticker": "PEP",   "name": "PepsiCo Inc."},
+    {"ticker": "MCD",   "name": "McDonald's Corporation"},
+    {"ticker": "TMO",   "name": "Thermo Fisher Scientific Inc."},
+    {"ticker": "CSCO",  "name": "Cisco Systems Inc."},
+    {"ticker": "ACN",   "name": "Accenture plc"},
+    {"ticker": "WFC",   "name": "Wells Fargo & Company"},
+    {"ticker": "ABT",   "name": "Abbott Laboratories"},
+    {"ticker": "NFLX",  "name": "Netflix Inc."},
+    {"ticker": "AMD",   "name": "Advanced Micro Devices Inc."},
+    {"ticker": "LIN",   "name": "Linde plc"},
+    {"ticker": "ADBE",  "name": "Adobe Inc."},
+    {"ticker": "TXN",   "name": "Texas Instruments Incorporated"},
+    {"ticker": "AMGN",  "name": "Amgen Inc."},
+    {"ticker": "PM",    "name": "Philip Morris International Inc."},
+    {"ticker": "NEE",   "name": "NextEra Energy Inc."},
+    {"ticker": "INTC",  "name": "Intel Corporation"},
+    {"ticker": "IBM",   "name": "IBM Corporation"},
+    {"ticker": "QCOM",  "name": "Qualcomm Incorporated"},
+    {"ticker": "DIS",   "name": "The Walt Disney Company"},
+    {"ticker": "GE",    "name": "GE Aerospace"},
+    {"ticker": "CAT",   "name": "Caterpillar Inc."},
+    {"ticker": "BA",    "name": "The Boeing Company"},
+    {"ticker": "GS",    "name": "The Goldman Sachs Group Inc."},
+    {"ticker": "MS",    "name": "Morgan Stanley"},
+    {"ticker": "RTX",   "name": "RTX Corporation"},
+    {"ticker": "PYPL",  "name": "PayPal Holdings Inc."},
+    {"ticker": "BKNG",  "name": "Booking Holdings Inc."},
+    {"ticker": "SBUX",  "name": "Starbucks Corporation"},
+    {"ticker": "NOW",   "name": "ServiceNow Inc."},
+    {"ticker": "SNOW",  "name": "Snowflake Inc."},
+    {"ticker": "UBER",  "name": "Uber Technologies Inc."},
+    {"ticker": "ABNB",  "name": "Airbnb Inc."},
+    {"ticker": "SHOP",  "name": "Shopify Inc."},
+    {"ticker": "SQ",    "name": "Block Inc."},
+    {"ticker": "PLTR",  "name": "Palantir Technologies Inc."},
+    {"ticker": "RIVN",  "name": "Rivian Automotive Inc."},
+    {"ticker": "F",     "name": "Ford Motor Company"},
+    {"ticker": "GM",    "name": "General Motors Company"},
+    {"ticker": "T",     "name": "AT&T Inc."},
+    {"ticker": "VZ",    "name": "Verizon Communications Inc."},
+    {"ticker": "CMCSA", "name": "Comcast Corporation"},
+    {"ticker": "C",     "name": "Citigroup Inc."},
+    {"ticker": "AXP",   "name": "American Express Company"},
+    {"ticker": "BLK",   "name": "BlackRock Inc."},
+    {"ticker": "SCHW",  "name": "The Charles Schwab Corporation"},
+    {"ticker": "CRM",   "name": "Salesforce Inc."},
+    {"ticker": "ORCL",  "name": "Oracle Corporation"},
+    {"ticker": "HON",   "name": "Honeywell International Inc."},
+    {"ticker": "UPS",   "name": "United Parcel Service Inc."},
+    {"ticker": "FDX",   "name": "FedEx Corporation"},
+    {"ticker": "LMT",   "name": "Lockheed Martin Corporation"},
+    {"ticker": "PFE",   "name": "Pfizer Inc."},
+    {"ticker": "GILD",  "name": "Gilead Sciences Inc."},
+    {"ticker": "BMY",   "name": "Bristol-Myers Squibb Company"},
+    {"ticker": "CVS",   "name": "CVS Health Corporation"},
+    {"ticker": "SPGI",  "name": "S&P Global Inc."},
+    {"ticker": "MMM",   "name": "3M Company"},
+    {"ticker": "DHR",   "name": "Danaher Corporation"},
+    {"ticker": "MO",    "name": "Altria Group Inc."},
+    {"ticker": "MDT",   "name": "Medtronic plc"},
+    {"ticker": "AMT",   "name": "American Tower Corporation"},
+    {"ticker": "CI",    "name": "The Cigna Group"},
+    {"ticker": "DE",    "name": "Deere & Company"},
+    {"ticker": "ELV",   "name": "Elevance Health Inc."},
+    {"ticker": "SO",    "name": "The Southern Company"},
+    {"ticker": "DUK",   "name": "Duke Energy Corporation"},
+    {"ticker": "COP",   "name": "ConocoPhillips"},
+    {"ticker": "SLB",   "name": "Schlumberger Limited"},
+    {"ticker": "ETN",   "name": "Eaton Corporation plc"},
+    {"ticker": "APD",   "name": "Air Products and Chemicals Inc."},
+    {"ticker": "ZTS",   "name": "Zoetis Inc."},
+    {"ticker": "BSX",   "name": "Boston Scientific Corporation"},
+    {"ticker": "ISRG",  "name": "Intuitive Surgical Inc."},
+    {"ticker": "REGN",  "name": "Regeneron Pharmaceuticals Inc."},
+    {"ticker": "VRTX",  "name": "Vertex Pharmaceuticals Incorporated"},
+    {"ticker": "MRNA",  "name": "Moderna Inc."},
+    {"ticker": "DXCM",  "name": "DexCom Inc."},
+    {"ticker": "PANW",  "name": "Palo Alto Networks Inc."},
+    {"ticker": "CRWD",  "name": "CrowdStrike Holdings Inc."},
+    {"ticker": "ZS",    "name": "Zscaler Inc."},
+    {"ticker": "OKTA",  "name": "Okta Inc."},
+    {"ticker": "NET",   "name": "Cloudflare Inc."},
+    {"ticker": "DDOG",  "name": "Datadog Inc."},
+    {"ticker": "MDB",   "name": "MongoDB Inc."},
+    {"ticker": "TTD",   "name": "The Trade Desk Inc."},
+    {"ticker": "RBLX",  "name": "Roblox Corporation"},
+    {"ticker": "COIN",  "name": "Coinbase Global Inc."},
+    {"ticker": "MSTR",  "name": "MicroStrategy Incorporated"},
+    {"ticker": "ARM",   "name": "Arm Holdings plc"},
+    {"ticker": "SMCI",  "name": "Super Micro Computer Inc."},
+    {"ticker": "CEG",   "name": "Constellation Energy Corporation"},
+    {"ticker": "VST",   "name": "Vistra Corp."},
+    {"ticker": "NRG",   "name": "NRG Energy Inc."},
+    {"ticker": "SPY",   "name": "SPDR S&P 500 ETF Trust"},
+    {"ticker": "QQQ",   "name": "Invesco QQQ Trust (Nasdaq-100)"},
+    {"ticker": "IWM",   "name": "iShares Russell 2000 ETF"},
+    {"ticker": "DIA",   "name": "SPDR Dow Jones Industrial Average ETF"},
+    {"ticker": "GLD",   "name": "SPDR Gold Shares ETF"},
+    {"ticker": "SLV",   "name": "iShares Silver Trust ETF"},
+    {"ticker": "USO",   "name": "United States Oil Fund LP"},
+    {"ticker": "TLT",   "name": "iShares 20+ Year Treasury Bond ETF"},
+    {"ticker": "VTI",   "name": "Vanguard Total Stock Market ETF"},
+    {"ticker": "VOO",   "name": "Vanguard S&P 500 ETF"},
+]
+
+# Build an index: ticker -> name, for fast lookup in search
+TICKER_INDEX = {t["ticker"]: t["name"] for t in TICKER_LIST}
+
+
+def format_market_cap(market_cap):
+    if not market_cap:
+        return "N/A"
+    if market_cap >= 1e12:
+        return f"{market_cap / 1e12:.2f}T"
+    if market_cap >= 1e9:
+        return f"{market_cap / 1e9:.2f}B"
+    if market_cap >= 1e6:
+        return f"{market_cap / 1e6:.2f}M"
+    return str(market_cap)
+
+
+def safe_float(value, digits=2):
+    try:
+        return round(float(value), digits) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+@app.route("/api/quote/<ticker>")
+def get_quote(ticker):
+    """
+    Returns real-time quote data for a ticker from Yahoo Finance.
+    Falls back gracefully if certain fields are missing.
+    """
+    ticker = ticker.upper().strip()
+    try:
+        stock = yf.Ticker(ticker)
+        info = stock.info
+
+        # Yahoo Finance returns an empty/minimal dict for invalid tickers
+        if not info or info.get("quoteType") is None:
+            return jsonify({"error": f"Ticker '{ticker}' not found or invalid."}), 404
+
+        # Current price: try several field names Yahoo uses depending on market hours
+        current_price = (
+            info.get("currentPrice")
+            or info.get("regularMarketPrice")
+            or info.get("ask")
+            or info.get("navPrice")
+        )
+
+        # If still None (pre/after-hours or ETF), fall back to recent history
+        if current_price is None:
+            hist = stock.history(period="5d", interval="1d")
+            if not hist.empty:
+                current_price = float(hist["Close"].iloc[-1])
+            else:
+                return jsonify({"error": f"No price data available for '{ticker}'."}), 404
+
+        prev_close = (
+            info.get("previousClose")
+            or info.get("regularMarketPreviousClose")
+            or current_price
+        )
+
+        change = float(current_price) - float(prev_close)
+        change_pct = (change / float(prev_close) * 100) if prev_close else 0
+
+        # yfinance returns dividendYield as a decimal fraction (0.0046 = 0.46%).
+        # Multiply by 100 to get percentage. Cap at 25% to filter data errors.
+        raw_yield = info.get("dividendYield") or 0
+        div_yield_pct = round(float(raw_yield) * 100, 2)
+        if div_yield_pct > 25:
+            div_yield_pct = None  # almost certainly a data error
+
+        return jsonify({
+            "ticker": ticker,
+            "name": info.get("longName") or info.get("shortName") or TICKER_INDEX.get(ticker, ticker),
+            "price": safe_float(current_price),
+            "change": safe_float(change),
+            "change_pct": safe_float(change_pct, 4),
+            "volume": info.get("volume") or info.get("regularMarketVolume") or 0,
+            "open": safe_float(info.get("open") or info.get("regularMarketOpen") or current_price),
+            "high": safe_float(info.get("dayHigh") or info.get("regularMarketDayHigh") or current_price),
+            "low": safe_float(info.get("dayLow") or info.get("regularMarketDayLow") or current_price),
+            "prev_close": safe_float(prev_close),
+            "market_cap": format_market_cap(info.get("marketCap")),
+            "pe_ratio": safe_float(info.get("trailingPE")),
+            "beta": safe_float(info.get("beta")),
+            "week52_high": safe_float(info.get("fiftyTwoWeekHigh")),
+            "week52_low": safe_float(info.get("fiftyTwoWeekLow")),
+            "dividend_yield": div_yield_pct,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/history/<ticker>")
+def get_history(ticker):
+    """
+    Returns OHLCV candle history for charting.
+    Defaults to today's intraday data (1d / 5m bars).
+    Automatically falls back to a longer period if today's session has no data
+    (e.g. weekend, holiday).
+    """
+    ticker = ticker.upper().strip()
+    period = request.args.get("period", "1d")
+    interval = request.args.get("interval", "5m")
+
+    try:
+        stock = yf.Ticker(ticker)
+        hist = stock.history(period=period, interval=interval)
+
+        # If today's intraday is empty (market closed / weekend), fall back to 5d/30m
+        if hist.empty and period == "1d":
+            hist = stock.history(period="5d", interval="30m")
+
+        # Final fallback: last 30 days of daily data
+        if hist.empty:
+            hist = stock.history(period="1mo", interval="1d")
+
+        if hist.empty:
+            return jsonify({"error": f"No historical data found for '{ticker}'."}), 404
+
+        data = []
+        for idx, row in hist.iterrows():
+            data.append({
+                "time": idx.isoformat(),
+                "open": safe_float(row["Open"]),
+                "high": safe_float(row["High"]),
+                "low": safe_float(row["Low"]),
+                "close": safe_float(row["Close"]),
+                "volume": int(row["Volume"]),
+            })
+
+        return jsonify({"ticker": ticker, "data": data})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/search")
+def search_tickers():
+    """
+    Autocomplete endpoint. Searches both ticker symbols and company names.
+    Returns up to 10 matches.
+    """
+    query = request.args.get("q", "").upper().strip()
+    if not query:
+        return jsonify([])
+
+    results = []
+    for t in TICKER_LIST:
+        if query in t["ticker"] or query in t["name"].upper():
+            results.append(t)
+        if len(results) >= 10:
+            break
+
+    return jsonify(results)
+
+
+if __name__ == "__main__":
+    app.run(debug=True, port=5000, host="127.0.0.1")

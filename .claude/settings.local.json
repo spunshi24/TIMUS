@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod +x /Users/sumitpunshi/Desktop/TIMUS/timus-main/backend/start.sh)"
+    ]
+  }
+}
