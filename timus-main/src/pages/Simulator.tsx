@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { Zap } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import SimulatorHeader from "@/components/simulator/SimulatorHeader";
 import ChartPanel from "@/components/simulator/ChartPanel";
 import OrderPanel from "@/components/simulator/OrderPanel";
 import PositionsPanel from "@/components/simulator/PositionsPanel";
+import TurboPanel from "@/components/simulator/TurboPanel";
 import { useToast } from "@/hooks/use-toast";
 
 export interface Position {
@@ -70,6 +72,7 @@ const Simulator = () => {
 
   // Per-ticker live prices so positions across all tickers show correct P&L
   const [pricesByTicker, setPricesByTicker] = useState<Record<string, number>>({});
+  const [turboOpen, setTurboOpen] = useState(false);
 
   // Refs — avoid stale closures inside callbacks
   const balanceRef = useRef(balance);
@@ -346,6 +349,21 @@ const Simulator = () => {
     }
   };
 
+  // ── Turbo order (direct fill at specified execution price) ────────────
+  const handleTurboOrder = (side: "buy" | "sell", qty: number, execPrice: number) => {
+    const newOrder: Order = {
+      id: Math.random().toString(36).substr(2, 9),
+      ticker: selectedTickerRef.current,
+      type: "market",
+      side,
+      quantity: qty,
+      status: "pending",
+      timestamp: new Date(),
+    };
+    setOrders((prev) => [...prev, newOrder]);
+    fillOrder(newOrder, execPrice);
+  };
+
   // ── Close a position via market sell ──────────────────────────────────
   const handleClosePosition = (positionId: string) => {
     const position = positionsRef.current.find((p) => p.id === positionId);
@@ -393,13 +411,21 @@ const Simulator = () => {
             </div>
 
             {/* Order Panel */}
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 space-y-4">
               <OrderPanel
                 ticker={selectedTicker}
                 balance={balance}
                 currentPrice={currentPrice}
                 onPlaceOrder={handlePlaceOrder}
               />
+              {/* Turbo Button */}
+              <button
+                onClick={() => setTurboOpen(true)}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-white text-sm bg-yellow-500 hover:bg-yellow-400 active:scale-95 transition-all shadow-lg"
+              >
+                <Zap className="w-4 h-4" />
+                Turbo Trade
+              </button>
             </div>
           </div>
 
@@ -464,6 +490,18 @@ const Simulator = () => {
           </div>
         </div>
       </div>
+
+      {/* Turbo Panel */}
+      {turboOpen && (
+        <TurboPanel
+          ticker={selectedTicker}
+          currentPrice={currentPrice}
+          balance={balance}
+          positions={positionsWithLivePrice}
+          onOrder={handleTurboOrder}
+          onClose={() => setTurboOpen(false)}
+        />
+      )}
     </div>
   );
 };

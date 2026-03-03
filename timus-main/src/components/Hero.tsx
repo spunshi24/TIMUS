@@ -6,12 +6,8 @@ import heroImage from "@/assets/hero-cyber-trading.jpg";
 const Hero = () => {
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-background via-muted/30 to-background">
-      {/* Animated Background */}
-      <div 
-        className="absolute inset-0 opacity-10 tech-grid"
-      />
-      
-      {/* Content */}
+      <div className="absolute inset-0 opacity-10 tech-grid" />
+
       <div className="container mx-auto px-4 relative z-10 pt-20">
         <div className="max-w-4xl mx-auto text-center space-y-8 animate-fadeIn">
           {/* Badge */}
@@ -30,8 +26,8 @@ const Hero = () => {
 
           {/* Subheading */}
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Simulated fictional data. Zero financial risk. Practice trading across stocks, 
-            crypto, forex, and commodities.
+            Live Yahoo Finance data. Zero financial risk. Practice trading stocks and ETFs
+            with real prices — build your skills before putting real money on the line.
           </p>
 
           {/* CTA Buttons */}
@@ -42,8 +38,8 @@ const Hero = () => {
                 <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="lg"
               onClick={() => document.querySelector('#about')?.scrollIntoView({ behavior: 'smooth' })}
             >
@@ -56,21 +52,21 @@ const Hero = () => {
             {[
               {
                 icon: TrendingUp,
-                title: "Simulated Data",
-                description: "Trade with fictional price action and realistic market behavior"
+                title: "Live Yahoo Finance Data",
+                description: "Real prices streamed directly from Yahoo Finance — refreshed every 30 seconds"
               },
               {
                 icon: Shield,
                 title: "Zero Risk",
-                description: "Practice with virtual funds, learn without losing real money"
+                description: "Practice with virtual funds. Learn without losing real money"
               },
               {
                 icon: Zap,
-                title: "Multiple Markets",
-                description: "Stocks, crypto, forex, commodities, and ETFs all in one platform"
+                title: "Practice Trading Stocks & ETFs",
+                description: "Trade real listed companies and funds — S&P 500, Nasdaq, and more"
               }
             ].map((feature, index) => (
-              <div 
+              <div
                 key={index}
                 className="p-6 rounded-lg border-2 border-border bg-card/80 backdrop-blur-sm hover:border-accent/40 transition-all hover:shadow-md group"
               >
@@ -83,7 +79,6 @@ const Hero = () => {
         </div>
       </div>
 
-      {/* Decorative elements */}
       <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-border to-transparent" />
     </section>
   );
