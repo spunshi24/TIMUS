@@ -53,14 +53,15 @@ export default function TurboPanel({
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end justify-center"
-      style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+      className="fixed inset-0 z-40 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)" }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg bg-zinc-950 border-t-2 border-zinc-700 rounded-t-2xl pb-safe"
+        className="w-full max-w-lg bg-zinc-950 border border-zinc-700 rounded-2xl overflow-y-auto"
         style={{
-          boxShadow: "0 -20px 60px rgba(0,0,0,0.6)",
+          maxHeight: "90vh",
+          boxShadow: "0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06)",
         }}
         onClick={(e) => e.stopPropagation()}
       >

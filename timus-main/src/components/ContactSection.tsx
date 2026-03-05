@@ -50,7 +50,7 @@ const ContactSection = () => {
             </Button>
 
             <Button variant="outline" className="gap-2 h-11 px-6 text-base" asChild>
-              <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer">
+              <a href="https://www.linkedin.com/in/sumit-punshi" target="_blank" rel="noopener noreferrer">
                 <Linkedin className="w-4 h-4" />
                 LinkedIn
               </a>

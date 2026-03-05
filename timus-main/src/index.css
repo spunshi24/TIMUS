@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Garamond — used sparingly for the Founder & CEO label in the footer */
+.garamond {
+  font-family: "EB Garamond", Georgia, serif;
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */

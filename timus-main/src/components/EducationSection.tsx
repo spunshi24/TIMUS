@@ -332,7 +332,7 @@ const EducationSection = () => {
             Knowledge is the foundation of successful trading. Study the concepts above, then apply
             them risk-free in the TiMUS simulator.
           </p>
-          <Button variant="default" size="lg" onClick={() => window.location.href = "/simulator"}>
+          <Button variant="default" size="lg" onClick={() => setShowBooks(true)}>
             Explore Learning Modules
           </Button>
         </div>

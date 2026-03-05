@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Zap } from "lucide-react";
+import { Zap, X } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import SimulatorHeader from "@/components/simulator/SimulatorHeader";
 import ChartPanel from "@/components/simulator/ChartPanel";
@@ -36,7 +36,6 @@ function loadFromStorage<T>(key: string, fallback: T): T {
     const raw = localStorage.getItem(key);
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
-    // Revive Date objects for positions/orders
     if (Array.isArray(parsed)) {
       return parsed.map((item: Record<string, unknown>) => ({
         ...item,
@@ -47,6 +46,61 @@ function loadFromStorage<T>(key: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+// Returns true if US equity markets are currently open (ET Mon–Fri 9:30–16:00)
+function isMarketOpen(): boolean {
+  const et = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "America/New_York" })
+  );
+  const day = et.getDay(); // 0=Sun, 6=Sat
+  if (day === 0 || day === 6) return false;
+  const totalMin = et.getHours() * 60 + et.getMinutes();
+  return totalMin >= 9 * 60 + 30 && totalMin < 16 * 60;
+}
+
+// ─── Blocked-order modal ─────────────────────────────────────────────────────
+function BlockedModal({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  const isMarketClosed = message.includes("SESSION CLOSED");
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)" }}
+      onClick={onDismiss}
+    >
+      <div
+        className="bg-zinc-950 border-2 border-red-500/50 rounded-2xl p-8 max-w-sm w-full text-center"
+        style={{ boxShadow: "0 0 60px rgba(239,68,68,0.25), 0 24px 60px rgba(0,0,0,0.6)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onDismiss}
+          className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+        <div className="text-5xl mb-4">{isMarketClosed ? "🔔" : "🚫"}</div>
+        <h3 className="text-lg font-bold text-white mb-2 leading-snug">{message}</h3>
+        {isMarketClosed && (
+          <p className="text-zinc-400 text-sm mt-2 leading-relaxed">
+            US equity markets are open<br />
+            <span className="text-white font-semibold">Monday – Friday, 9:30 AM – 4:00 PM ET</span>
+          </p>
+        )}
+        {!isMarketClosed && (
+          <p className="text-zinc-400 text-sm mt-2">
+            Add funds or reduce your order size.
+          </p>
+        )}
+        <button
+          className="mt-6 px-8 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl font-semibold transition-colors text-sm"
+          onClick={onDismiss}
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -70,15 +124,14 @@ const Simulator = () => {
     loadFromStorage("timus_orders", [])
   );
 
-  // Per-ticker live prices so positions across all tickers show correct P&L
   const [pricesByTicker, setPricesByTicker] = useState<Record<string, number>>({});
   const [turboOpen, setTurboOpen] = useState(false);
+  const [blockedMsg, setBlockedMsg] = useState<string | null>(null);
 
   // Refs — avoid stale closures inside callbacks
   const balanceRef = useRef(balance);
   const positionsRef = useRef<Position[]>(positions);
   const pricesByTickerRef = useRef<Record<string, number>>({});
-  // Working orders (limit/stop not yet triggered)
   const workingOrdersRef = useRef<Order[]>([]);
 
   // ── Persist to localStorage ─────────────────────────────────────────────
@@ -114,9 +167,7 @@ const Simulator = () => {
   };
 
   // ── Core fill logic ─────────────────────────────────────────────────────
-  // Called when an order should execute. Uses refs to avoid stale state.
   const fillOrder = useCallback((order: Order, executionPrice: number) => {
-    // Mark filled
     setOrders((prev) =>
       prev.map((o) => (o.id === order.id ? { ...o, status: "filled" as const } : o))
     );
@@ -124,11 +175,7 @@ const Simulator = () => {
     if (order.side === "buy") {
       const cost = executionPrice * order.quantity;
       if (cost > balanceRef.current) {
-        toast({
-          title: "Insufficient Funds",
-          description: `Need $${cost.toFixed(2)}, have $${balanceRef.current.toFixed(2)}`,
-          variant: "destructive",
-        });
+        setBlockedMsg("ORDER NOT FILLED — INSUFFICIENT FUNDS");
         setOrders((prev) =>
           prev.map((o) => (o.id === order.id ? { ...o, status: "cancelled" as const } : o))
         );
@@ -157,11 +204,7 @@ const Simulator = () => {
       // Sell
       const pos = positionsRef.current.find((p) => p.ticker === order.ticker);
       if (!pos || pos.quantity < order.quantity) {
-        toast({
-          title: "Insufficient Shares",
-          description: `You only have ${pos?.quantity ?? 0} shares of ${order.ticker}`,
-          variant: "destructive",
-        });
+        setBlockedMsg("ORDER NOT FILLED — INSUFFICIENT SHARES");
         setOrders((prev) =>
           prev.map((o) => (o.id === order.id ? { ...o, status: "cancelled" as const } : o))
         );
@@ -205,21 +248,16 @@ const Simulator = () => {
       let fires = false;
 
       if (order.type === "limit") {
-        // Buy limit: fill when price falls to/below the limit price
-        // Sell limit: fill when price rises to/above the limit price
         fires =
           (order.side === "buy" && price <= trigger) ||
           (order.side === "sell" && price >= trigger);
       } else if (order.type === "stop") {
-        // Stop sell (stop-loss): triggers when price falls to/below stop
-        // Stop buy  (breakout): triggers when price rises to/above stop
         fires =
           (order.side === "sell" && price <= trigger) ||
           (order.side === "buy" && price >= trigger);
       }
 
       if (fires) {
-        // Mark as pending (transitioning) then fill at current market price
         setOrders((prev) =>
           prev.map((o) => (o.id === order.id ? { ...o, status: "pending" as const } : o))
         );
@@ -241,6 +279,12 @@ const Simulator = () => {
 
   // ── Place order (entry point from OrderPanel) ──────────────────────────
   const handlePlaceOrder = (order: Omit<Order, "id" | "status" | "timestamp">) => {
+    // Market hours gate
+    if (!isMarketOpen()) {
+      setBlockedMsg("ORDER NOT FILLED — NEW YORK SESSION CLOSED");
+      return;
+    }
+
     const livePrice = pricesByTickerRef.current[order.ticker] ?? 0;
 
     if (livePrice <= 0) {
@@ -252,7 +296,6 @@ const Simulator = () => {
       return;
     }
 
-    // Validate limit/stop price
     if (order.type !== "market") {
       const p = order.price;
       if (!p || isNaN(p) || p <= 0) {
@@ -276,7 +319,6 @@ const Simulator = () => {
 
     // ── Market order ─────────────────────────────────────────────────────
     if (order.type === "market") {
-      // Execute at exact live price — no hidden slippage
       setTimeout(() => fillOrder(newOrder, livePrice), 300);
       toast({
         title: "Market Order Placed",
@@ -289,18 +331,15 @@ const Simulator = () => {
 
     // ── Limit order ──────────────────────────────────────────────────────
     if (order.type === "limit") {
-      // Buy limit: fills if market is at or BELOW the limit (you get ≤ what you're willing to pay)
-      // Sell limit: fills if market is at or ABOVE the limit (you get ≥ what you want)
       const immediatelyFillable =
         (order.side === "buy" && livePrice <= triggerPrice) ||
         (order.side === "sell" && livePrice >= triggerPrice);
 
       if (immediatelyFillable) {
-        // Fill at the current market price (better than or equal to limit)
         const execPrice =
           order.side === "buy"
-            ? Math.min(livePrice, triggerPrice)   // pay the lower of the two
-            : Math.max(livePrice, triggerPrice);  // receive the higher of the two
+            ? Math.min(livePrice, triggerPrice)
+            : Math.max(livePrice, triggerPrice);
         setTimeout(() => fillOrder(newOrder, execPrice), 300);
         toast({
           title: "Limit Order — Filling Now",
@@ -314,7 +353,7 @@ const Simulator = () => {
         workingOrdersRef.current = [...workingOrdersRef.current, workingOrder];
         toast({
           title: "Limit Order Working",
-          description: `${order.side === "buy" ? "Buy" : "Sell"} ${order.quantity} ${order.ticker} — waiting for price to reach $${triggerPrice.toFixed(2)} (now $${livePrice.toFixed(2)})`,
+          description: `${order.side === "buy" ? "Buy" : "Sell"} ${order.quantity} ${order.ticker} — waiting for $${triggerPrice.toFixed(2)} (now $${livePrice.toFixed(2)})`,
         });
       }
       return;
@@ -322,14 +361,11 @@ const Simulator = () => {
 
     // ── Stop order ───────────────────────────────────────────────────────
     if (order.type === "stop") {
-      // Stop sell (stop-loss): triggers when price DROPS to/below stop price
-      // Stop buy (breakout entry): triggers when price RISES to/above stop price
       const alreadyTriggered =
         (order.side === "sell" && livePrice <= triggerPrice) ||
         (order.side === "buy" && livePrice >= triggerPrice);
 
       if (alreadyTriggered) {
-        // Stop already triggered — fill at market immediately
         setTimeout(() => fillOrder(newOrder, livePrice), 300);
         toast({
           title: "Stop Order — Triggered Immediately",
@@ -349,8 +385,12 @@ const Simulator = () => {
     }
   };
 
-  // ── Turbo order (direct fill at specified execution price) ────────────
+  // ── Turbo order ────────────────────────────────────────────────────────
   const handleTurboOrder = (side: "buy" | "sell", qty: number, execPrice: number) => {
+    if (!isMarketOpen()) {
+      setBlockedMsg("ORDER NOT FILLED — NEW YORK SESSION CLOSED");
+      return;
+    }
     const newOrder: Order = {
       id: Math.random().toString(36).substr(2, 9),
       ticker: selectedTickerRef.current,
@@ -379,7 +419,6 @@ const Simulator = () => {
   // ── Derived values ────────────────────────────────────────────────────
   const currentPrice = pricesByTicker[selectedTicker] ?? 0;
 
-  // Each position gets the latest price for its own ticker, falls back to entry price
   const positionsWithLivePrice = positions.map((p) => ({
     ...p,
     currentPrice: pricesByTicker[p.ticker] ?? p.entryPrice,
@@ -411,21 +450,13 @@ const Simulator = () => {
             </div>
 
             {/* Order Panel */}
-            <div className="lg:col-span-1 space-y-4">
+            <div className="lg:col-span-1">
               <OrderPanel
                 ticker={selectedTicker}
                 balance={balance}
                 currentPrice={currentPrice}
                 onPlaceOrder={handlePlaceOrder}
               />
-              {/* Turbo Button */}
-              <button
-                onClick={() => setTurboOpen(true)}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-white text-sm bg-yellow-500 hover:bg-yellow-400 active:scale-95 transition-all shadow-lg"
-              >
-                <Zap className="w-4 h-4" />
-                Turbo Trade
-              </button>
             </div>
           </div>
 
@@ -491,6 +522,18 @@ const Simulator = () => {
         </div>
       </div>
 
+      {/* Fixed Turbo FAB — always visible while on simulator */}
+      {!turboOpen && (
+        <button
+          onClick={() => setTurboOpen(true)}
+          className="fixed bottom-6 right-6 z-30 flex items-center gap-2 px-5 py-3 rounded-full font-bold text-white text-sm bg-yellow-500 hover:bg-yellow-400 active:scale-95 transition-all shadow-2xl"
+          style={{ boxShadow: "0 4px 24px rgba(234,179,8,0.4)" }}
+        >
+          <Zap className="w-4 h-4" />
+          Turbo
+        </button>
+      )}
+
       {/* Turbo Panel */}
       {turboOpen && (
         <TurboPanel
@@ -501,6 +544,11 @@ const Simulator = () => {
           onOrder={handleTurboOrder}
           onClose={() => setTurboOpen(false)}
         />
+      )}
+
+      {/* Blocked Order Modal */}
+      {blockedMsg && (
+        <BlockedModal message={blockedMsg} onDismiss={() => setBlockedMsg(null)} />
       )}
     </div>
   );
