@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>TiMUS</title>
+  <script>
+    // SPA redirect for GitHub Pages — preserves the path on hard reload / direct link
+    // See: https://github.com/rafgraph/spa-github-pages
+    var segmentsToKeep = 1; // keep the /TIMUS repo segment
+    var l = window.location;
+    l.replace(
+      l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+      l.pathname.split('/').slice(0, 1 + segmentsToKeep).join('/') + '/?p=/' +
+      l.pathname.slice(1).split('/').slice(segmentsToKeep).join('/').replace(/&/g, '~and~') +
+      (l.search ? '&q=' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+      l.hash
+    );
+  </script>
+</head>
+<body></body>
+</html>

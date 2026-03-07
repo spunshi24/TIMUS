@@ -22,6 +22,23 @@
   </head>
 
   <body>
+    <!-- SPA redirect decoder — pairs with public/404.html -->
+    <script>
+      (function(l) {
+        if (l.search[1] === 'p' && l.search.indexOf('p=/') === 1) {
+          var decoded = l.search.slice(1).split('&').reduce(function(q, v) {
+            var a = v.split('=');
+            if (a[0] === 'p') q.path = a.slice(1).join('=').replace(/~and~/g, '&');
+            if (a[0] === 'q') q.query = '?' + a.slice(1).join('=').replace(/~and~/g, '&');
+            return q;
+          }, { path: '', query: '' });
+          window.history.replaceState(
+            null, null,
+            l.pathname.split('/').slice(0, 2).join('/') + decoded.path + decoded.query + l.hash
+          );
+        }
+      }(window.location));
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

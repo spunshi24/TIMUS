@@ -5,6 +5,8 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  // In production (GitHub Pages) the app lives at /TIMUS/
+  base: mode === "production" ? "/TIMUS/" : "/",
   server: {
     host: "::",
     port: 8080,
