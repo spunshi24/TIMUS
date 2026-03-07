@@ -4,6 +4,7 @@ import Navigation from "@/components/Navigation";
 import { TrendingUp, TrendingDown, RefreshCw, BarChart2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Position } from "./Simulator";
+import { API_BASE } from "@/lib/api";
 
 interface QuoteSummary {
   ticker: string;
@@ -93,7 +94,7 @@ const Portfolio = () => {
 
     // Fetch live quotes for every held ticker in parallel
     const quoteResults = await Promise.allSettled(
-      tickers.map((t) => fetch(`/api/quote/${t}`).then((r) => r.json() as Promise<QuoteSummary>))
+      tickers.map((t) => fetch(`${API_BASE}/api/quote/${t}`).then((r) => r.json() as Promise<QuoteSummary>))
     );
 
     const rows: HoldingRow[] = [];

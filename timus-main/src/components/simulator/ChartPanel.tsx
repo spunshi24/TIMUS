@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { TrendingUp, TrendingDown, AlertCircle, Loader2, RefreshCw } from "lucide-react";
+import { API_BASE } from "@/lib/api";
 
 interface ChartPanelProps {
   ticker: string;
@@ -52,8 +53,8 @@ const ChartPanel = ({ ticker, onPriceUpdate }: ChartPanelProps) => {
 
     try {
       const [quoteRes, histRes] = await Promise.all([
-        fetch(`/api/quote/${ticker}`),
-        fetch(`/api/history/${ticker}?period=1d&interval=5m`),
+        fetch(`${API_BASE}/api/quote/${ticker}`),
+        fetch(`${API_BASE}/api/history/${ticker}?period=1d&interval=5m`),
       ]);
 
       if (!quoteRes.ok) {

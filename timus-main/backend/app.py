@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import yfinance as yf
+import os
 
 app = Flask(__name__)
 CORS(app)
@@ -295,4 +296,6 @@ def search_tickers():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000, host="127.0.0.1")
+    port = int(os.environ.get("PORT", 5000))
+    host = "0.0.0.0" if os.environ.get("PORT") else "127.0.0.1"
+    app.run(debug=False, port=port, host=host)

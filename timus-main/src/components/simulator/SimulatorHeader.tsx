@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Search, Edit2 } from "lucide-react";
+import { API_BASE } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -59,7 +60,7 @@ const SimulatorHeader = ({
     }
     const timeout = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}`);
         if (res.ok) {
           const data: TickerResult[] = await res.json();
           setSuggestions(data);
