@@ -6,7 +6,10 @@ import ChartPanel from "@/components/simulator/ChartPanel";
 import OrderPanel from "@/components/simulator/OrderPanel";
 import PositionsPanel from "@/components/simulator/PositionsPanel";
 import TurboPanel from "@/components/simulator/TurboPanel";
+import AuthModal from "@/components/AuthModal";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
+import { API_BASE } from "@/lib/api";
 
 export interface Position {
   id: string;
@@ -107,8 +110,10 @@ function BlockedModal({ message, onDismiss }: { message: string; onDismiss: () =
 
 const Simulator = () => {
   const { toast } = useToast();
+  const { user, token } = useAuth();
 
   const [selectedTicker, setSelectedTicker] = useState("AAPL");
+  const [authModalOpen, setAuthModalOpen] = useState(false);
   const selectedTickerRef = useRef("AAPL");
 
   const [balance, setBalance] = useState<number>(() =>
@@ -131,6 +136,7 @@ const Simulator = () => {
   // Refs — avoid stale closures inside callbacks
   const balanceRef = useRef(balance);
   const positionsRef = useRef<Position[]>(positions);
+  const ordersRef = useRef<Order[]>(orders);
   const pricesByTickerRef = useRef<Record<string, number>>({});
   const workingOrdersRef = useRef<Order[]>([]);
 
@@ -142,6 +148,7 @@ const Simulator = () => {
 
   useEffect(() => {
     localStorage.setItem("timus_orders", JSON.stringify(orders));
+    ordersRef.current = orders;
   }, [orders]);
 
   useEffect(() => {
@@ -165,6 +172,73 @@ const Simulator = () => {
     setBalance(newBalance);
     setInitialBalance(newBalance);
   };
+
+  // ── Portfolio sync (fire-and-forget) ────────────────────────────────────
+  const syncPortfolio = useCallback(async (
+    currentBalance: number,
+    currentPositions: Position[],
+    currentOrders: Order[],
+    currentInitialBalance: number,
+  ) => {
+    if (!token) return;
+    try {
+      await fetch(`${API_BASE}/api/portfolio/save`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          balance: currentBalance,
+          initialBalance: currentInitialBalance,
+          positions: currentPositions,
+          orders: currentOrders,
+        }),
+      });
+    } catch {
+      // Silently ignore — never block trading on a sync failure
+    }
+  }, [token]);
+
+  // ── Load portfolio from backend (on login / cross-device) ───────────────
+  const loadPortfolioFromBackend = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/portfolio/load`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.found) return;
+
+      localStorage.setItem("timus_balance", JSON.stringify(data.balance));
+      localStorage.setItem("timus_initial_balance", JSON.stringify(data.initialBalance));
+      localStorage.setItem("timus_positions", JSON.stringify(data.positions));
+      localStorage.setItem("timus_orders", JSON.stringify(data.orders));
+
+      setBalance(data.balance);
+      setInitialBalance(data.initialBalance);
+      setPositions(
+        (data.positions as Record<string, unknown>[]).map((p) => ({
+          ...p,
+          timestamp: p.timestamp ? new Date(p.timestamp as string) : new Date(),
+        })) as Position[]
+      );
+      setOrders(
+        (data.orders as Record<string, unknown>[]).map((o) => ({
+          ...o,
+          timestamp: o.timestamp ? new Date(o.timestamp as string) : new Date(),
+        })) as Order[]
+      );
+    } catch {
+      // Silently fall back to local data
+    }
+  }, [token]);
+
+  // Load from backend when token becomes available (login / page reload while logged in)
+  useEffect(() => {
+    if (user && token) loadPortfolioFromBackend();
+  }, [user, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Core fill logic ─────────────────────────────────────────────────────
   const fillOrder = useCallback((order: Order, executionPrice: number) => {
@@ -234,7 +308,15 @@ const Simulator = () => {
         description: `Sold ${order.quantity} ${order.ticker} @ $${executionPrice.toFixed(2)} — P&L: ${profit >= 0 ? "+" : ""}$${profit.toFixed(2)}`,
       });
     }
-  }, [toast]);
+
+    // Post-fill: track anon trades or sync logged-in portfolio
+    if (!user) {
+      const prev = parseInt(localStorage.getItem("timus_anon_trades") || "0", 10);
+      localStorage.setItem("timus_anon_trades", String(prev + 1));
+    } else {
+      syncPortfolio(balanceRef.current, positionsRef.current, ordersRef.current, initialBalance);
+    }
+  }, [toast, user, syncPortfolio, initialBalance]);
 
   // ── Check working orders when a new price arrives ──────────────────────
   const checkWorkingOrders = useCallback((ticker: string, price: number) => {
@@ -277,8 +359,23 @@ const Simulator = () => {
     checkWorkingOrders(ticker, price);
   }, [checkWorkingOrders]);
 
+  // ── Auth success: save anon portfolio then load from backend ────────────
+  const handleAuthSuccess = useCallback(async () => {
+    await syncPortfolio(balanceRef.current, positionsRef.current, ordersRef.current, initialBalance);
+    await loadPortfolioFromBackend();
+  }, [syncPortfolio, loadPortfolioFromBackend, initialBalance]);
+
   // ── Place order (entry point from OrderPanel) ──────────────────────────
   const handlePlaceOrder = (order: Omit<Order, "id" | "status" | "timestamp">) => {
+    // Auth gate: anonymous users capped at 4 free trades
+    if (!user) {
+      const anonCount = parseInt(localStorage.getItem("timus_anon_trades") || "0", 10);
+      if (anonCount >= 4) {
+        setAuthModalOpen(true);
+        return;
+      }
+    }
+
     // Market hours gate
     if (!isMarketOpen()) {
       setBlockedMsg("ORDER NOT FILLED — NEW YORK SESSION CLOSED");
@@ -387,6 +484,15 @@ const Simulator = () => {
 
   // ── Turbo order ────────────────────────────────────────────────────────
   const handleTurboOrder = (side: "buy" | "sell", qty: number, execPrice: number) => {
+    // Auth gate (same as handlePlaceOrder)
+    if (!user) {
+      const anonCount = parseInt(localStorage.getItem("timus_anon_trades") || "0", 10);
+      if (anonCount >= 4) {
+        setAuthModalOpen(true);
+        return;
+      }
+    }
+
     if (!isMarketOpen()) {
       setBlockedMsg("ORDER NOT FILLED — NEW YORK SESSION CLOSED");
       return;
@@ -550,6 +656,13 @@ const Simulator = () => {
       {blockedMsg && (
         <BlockedModal message={blockedMsg} onDismiss={() => setBlockedMsg(null)} />
       )}
+
+      {/* Auth Modal — shown when anonymous user hits 5-trade limit */}
+      <AuthModal
+        open={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onSuccess={handleAuthSuccess}
+      />
     </div>
   );
 };

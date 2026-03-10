@@ -2,9 +2,61 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import yfinance as yf
 import os
+import psycopg2
+import psycopg2.extras
+import bcrypt
+import json
+from flask_jwt_extended import (
+    JWTManager, create_access_token,
+    jwt_required, get_jwt_identity,
+)
 
 app = Flask(__name__)
 CORS(app)
+
+# ─── JWT config ──────────────────────────────────────────────────────────────
+app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "dev-secret-change-me")
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False  # tokens don't expire
+jwt = JWTManager(app)
+
+# ─── Database helpers ────────────────────────────────────────────────────────
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+
+def get_db():
+    return psycopg2.connect(DATABASE_URL)
+
+
+def init_db():
+    """Create tables on first deploy. Called at module load."""
+    if not DATABASE_URL:
+        return  # local dev without DB — skip silently
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW()
+        );
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS portfolios (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            balance FLOAT,
+            initial_balance FLOAT,
+            positions JSONB DEFAULT '[]',
+            orders JSONB DEFAULT '[]',
+            updated_at TIMESTAMP DEFAULT NOW(),
+            UNIQUE(user_id)
+        );
+    """)
+    conn.commit()
+    cur.close()
+    conn.close()
 
 # Curated list of real, actively-traded tickers used for autocomplete search.
 # Covers S&P 500 large-caps, popular tech, financials, healthcare, energy, etc.
@@ -294,6 +346,127 @@ def search_tickers():
 
     return jsonify(results)
 
+
+# ─── Auth routes ─────────────────────────────────────────────────────────────
+
+@app.route("/api/auth/register", methods=["POST"])
+def register():
+    if not DATABASE_URL:
+        return jsonify({"error": "Database not configured"}), 503
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+    if not username or not email or not password:
+        return jsonify({"error": "username, email and password are required"}), 400
+    if len(password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters"}), 400
+    password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "INSERT INTO users (username, email, password_hash) VALUES (%s, %s, %s) RETURNING id, username, email",
+            (username, email, password_hash),
+        )
+        user = dict(cur.fetchone())
+        conn.commit()
+        cur.close()
+        conn.close()
+    except psycopg2.errors.UniqueViolation:
+        return jsonify({"error": "Username or email already in use"}), 409
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    token = create_access_token(identity=str(user["id"]))
+    return jsonify({"token": token, "user": {"username": user["username"], "email": user["email"]}}), 201
+
+
+@app.route("/api/auth/login", methods=["POST"])
+def login():
+    if not DATABASE_URL:
+        return jsonify({"error": "Database not configured"}), 503
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+    if not email or not password:
+        return jsonify({"error": "email and password are required"}), 400
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+        user = cur.fetchone()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    if not user or not bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
+        return jsonify({"error": "Invalid email or password"}), 401
+    token = create_access_token(identity=str(user["id"]))
+    return jsonify({"token": token, "user": {"username": user["username"], "email": user["email"]}})
+
+
+# ─── Portfolio routes ─────────────────────────────────────────────────────────
+
+@app.route("/api/portfolio/load", methods=["GET"])
+@jwt_required()
+def load_portfolio():
+    if not DATABASE_URL:
+        return jsonify({"error": "Database not configured"}), 503
+    user_id = int(get_jwt_identity())
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT * FROM portfolios WHERE user_id = %s", (user_id,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    if not row:
+        return jsonify({"found": False})
+    return jsonify({
+        "found": True,
+        "balance": row["balance"],
+        "initialBalance": row["initial_balance"],
+        "positions": row["positions"],
+        "orders": row["orders"],
+    })
+
+
+@app.route("/api/portfolio/save", methods=["POST"])
+@jwt_required()
+def save_portfolio():
+    if not DATABASE_URL:
+        return jsonify({"error": "Database not configured"}), 503
+    user_id = int(get_jwt_identity())
+    data = request.get_json(silent=True) or {}
+    balance = data.get("balance", 100000)
+    initial_balance = data.get("initialBalance", 100000)
+    positions = json.dumps(data.get("positions", []))
+    orders = json.dumps(data.get("orders", []))
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO portfolios (user_id, balance, initial_balance, positions, orders, updated_at)
+            VALUES (%s, %s, %s, %s, %s, NOW())
+            ON CONFLICT (user_id) DO UPDATE SET
+                balance = EXCLUDED.balance,
+                initial_balance = EXCLUDED.initial_balance,
+                positions = EXCLUDED.positions,
+                orders = EXCLUDED.orders,
+                updated_at = NOW()
+        """, (user_id, balance, initial_balance, positions, orders))
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    return jsonify({"ok": True})
+
+
+# ─── Startup ──────────────────────────────────────────────────────────────────
+init_db()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

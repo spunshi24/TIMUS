@@ -1,3 +1,6 @@
 flask>=3.0.0
 flask-cors>=4.0.0
 yfinance>=0.2.40
+flask-jwt-extended>=4.0.0
+bcrypt>=4.0.0
+psycopg2-binary>=2.9.0

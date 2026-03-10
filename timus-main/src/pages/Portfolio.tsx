@@ -5,6 +5,7 @@ import { TrendingUp, TrendingDown, RefreshCw, BarChart2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Position } from "./Simulator";
 import { API_BASE } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 interface QuoteSummary {
   ticker: string;
@@ -70,6 +71,7 @@ function aggregatePositions(positions: Position[]): Map<string, { shares: number
 }
 
 const Portfolio = () => {
+  const { user, token } = useAuth();
   const [holdings, setHoldings] = useState<HoldingRow[]>([]);
   const [cash, setCash] = useState(100000);
   const [initialBalance, setInitialBalance] = useState(100000);
@@ -134,8 +136,30 @@ const Portfolio = () => {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    const init = async () => {
+      // If logged in, pull latest portfolio from backend before rendering
+      if (user && token) {
+        try {
+          const res = await fetch(`${API_BASE}/api/portfolio/load`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.found) {
+              localStorage.setItem("timus_balance", JSON.stringify(data.balance));
+              localStorage.setItem("timus_initial_balance", JSON.stringify(data.initialBalance));
+              localStorage.setItem("timus_positions", JSON.stringify(data.positions));
+              localStorage.setItem("timus_orders", JSON.stringify(data.orders));
+            }
+          }
+        } catch {
+          // Fall through to local data
+        }
+      }
+      fetchData();
+    };
+    init();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Totals ──────────────────────────────────────────────────────────────
   const totalMarketValue = holdings.reduce((s, h) => s + h.marketValue, 0);

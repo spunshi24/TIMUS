@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/AuthContext";
 
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   const navItems = [
     { name: "Home", path: "/" },
@@ -50,9 +52,19 @@ const Navigation = () => {
                 {item.name}
               </Link>
             ))}
-            <Button variant="default" size="sm" className="ml-4" asChild>
-              <Link to="/simulator">Start Trading</Link>
-            </Button>
+            {user ? (
+              <div className="flex items-center gap-3 ml-4">
+                <span className="text-sm text-foreground/80 font-medium">{user.username}</span>
+                <Button variant="outline" size="sm" onClick={logout} className="gap-1.5">
+                  <LogOut className="w-3.5 h-3.5" />
+                  Logout
+                </Button>
+              </div>
+            ) : (
+              <Button variant="default" size="sm" className="ml-4" asChild>
+                <Link to="/simulator">Start Trading</Link>
+              </Button>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -81,9 +93,19 @@ const Navigation = () => {
               </Link>
             ))}
             <div className="px-4 pt-4">
-              <Button variant="default" className="w-full" asChild>
-                <Link to="/simulator">Start Trading</Link>
-              </Button>
+              {user ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-foreground/80 font-medium">{user.username}</span>
+                  <Button variant="outline" size="sm" onClick={() => { logout(); setIsOpen(false); }} className="gap-1.5">
+                    <LogOut className="w-3.5 h-3.5" />
+                    Logout
+                  </Button>
+                </div>
+              ) : (
+                <Button variant="default" className="w-full" asChild>
+                  <Link to="/simulator">Start Trading</Link>
+                </Button>
+              )}
             </div>
           </div>
         )}
