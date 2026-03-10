@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, Edit2 } from "lucide-react";
+import { Search, Edit2, UserCircle2 } from "lucide-react";
 import { API_BASE } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/context/AuthContext";
 
 interface TickerResult {
   ticker: string;
@@ -16,6 +17,7 @@ interface SimulatorHeaderProps {
   selectedTicker: string;
   onTickerChange: (ticker: string) => void;
   onBalanceChange: (balance: number) => void;
+  onAuthClick: () => void;
 }
 
 const SimulatorHeader = ({
@@ -25,7 +27,9 @@ const SimulatorHeader = ({
   selectedTicker,
   onTickerChange,
   onBalanceChange,
+  onAuthClick,
 }: SimulatorHeaderProps) => {
+  const { user } = useAuth();
   const [isEditingBalance, setIsEditingBalance] = useState(false);
   const [tempBalance, setTempBalance] = useState(balance.toString());
 
@@ -149,6 +153,24 @@ const SimulatorHeader = ({
                 </div>
               )}
             </div>
+          </div>
+
+          {/* ── Auth state — between search and balance ──────────────────── */}
+          <div className="flex items-center shrink-0">
+            {user ? (
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-muted/60 border border-border">
+                <UserCircle2 className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-semibold text-foreground">{user.username}</span>
+              </div>
+            ) : (
+              <button
+                onClick={onAuthClick}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-border hover:bg-muted text-sm font-semibold text-foreground transition-colors"
+              >
+                <UserCircle2 className="w-4 h-4 text-muted-foreground" />
+                Sign Up / Log In
+              </button>
+            )}
           </div>
 
           {/* ── Portfolio stats ──────────────────────────────────────────── */}

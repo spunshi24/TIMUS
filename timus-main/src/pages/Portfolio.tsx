@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import { TrendingUp, TrendingDown, RefreshCw, BarChart2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { Position } from "./Simulator";
+import type { Position, Order } from "./Simulator";
 import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
@@ -77,6 +77,8 @@ const Portfolio = () => {
   const [initialBalance, setInitialBalance] = useState(100000);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [historyFilter, setHistoryFilter] = useState<"1h" | "6h" | "24h">("24h");
 
   const fetchData = async () => {
     setLoading(true);
@@ -84,6 +86,19 @@ const Portfolio = () => {
     const { balance, initialBalance: initBal } = loadBalance();
     setCash(balance);
     setInitialBalance(initBal);
+
+    // Load order history
+    try {
+      const rawOrders = JSON.parse(localStorage.getItem("timus_orders") || "[]");
+      setOrders(
+        (rawOrders as Record<string, unknown>[]).map((o) => ({
+          ...o,
+          timestamp: o.timestamp ? new Date(o.timestamp as string) : new Date(),
+        })) as Order[]
+      );
+    } catch {
+      setOrders([]);
+    }
 
     if (positions.length === 0) {
       setHoldings([]);
@@ -183,7 +198,9 @@ const Portfolio = () => {
           {/* ── Page header ──────────────────────────────────────────────── */}
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Portfolio</h1>
+              <h1 className="text-3xl font-bold text-foreground">
+                {user ? `${user.username} — Portfolio` : "Portfolio"}
+              </h1>
               {lastUpdated && (
                 <p className="text-sm text-muted-foreground mt-1">
                   Updated {lastUpdated.toLocaleTimeString()}
@@ -386,6 +403,93 @@ const Portfolio = () => {
               </div>
             )}
           </div>
+
+          {/* ── Order History ─────────────────────────────────────────────── */}
+          {(() => {
+            const filterMs = { "1h": 3600000, "6h": 21600000, "24h": 86400000 }[historyFilter];
+            const now = Date.now();
+            const filtered = orders
+              .filter((o) => now - new Date(o.timestamp).getTime() <= filterMs)
+              .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+            return (
+              <div className="mt-6 rounded-lg border-2 border-border bg-card shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
+                  <h2 className="text-lg font-bold text-foreground">Order History</h2>
+                  {/* Time filter */}
+                  <div className="flex items-center gap-1 bg-muted/50 rounded-xl p-1">
+                    {(["1h", "6h", "24h"] as const).map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setHistoryFilter(f)}
+                        className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                          historyFilter === f
+                            ? "bg-background text-primary shadow-sm border border-border"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="p-4 space-y-2">
+                  {filtered.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8 text-sm">
+                      No orders in the last {historyFilter}
+                    </p>
+                  ) : (
+                    filtered.map((order) => (
+                      <div
+                        key={order.id}
+                        className="flex items-center justify-between p-3 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors"
+                      >
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="font-bold text-foreground w-16">{order.ticker}</span>
+                          <span
+                            className={`px-2 py-0.5 rounded text-xs font-bold ${
+                              order.side === "buy"
+                                ? "bg-success/20 text-success"
+                                : "bg-destructive/20 text-destructive"
+                            }`}
+                          >
+                            {order.side.toUpperCase()}
+                          </span>
+                          <span className="text-xs text-muted-foreground uppercase tracking-wide">
+                            {order.type}
+                          </span>
+                          <span className="text-sm text-foreground font-medium">
+                            {order.quantity} shares
+                          </span>
+                          {order.price != null && (
+                            <span className="text-sm text-muted-foreground">
+                              @ ${order.price.toFixed(2)}
+                            </span>
+                          )}
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(order.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+                        <span
+                          className={`px-3 py-1 rounded text-xs font-bold shrink-0 ${
+                            order.status === "filled"
+                              ? "bg-success/20 text-success"
+                              : order.status === "working"
+                              ? "bg-yellow-400/20 text-yellow-600"
+                              : order.status === "pending"
+                              ? "bg-blue-400/20 text-blue-600"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {order.status.toUpperCase()}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ── Cash row ──────────────────────────────────────────────────── */}
           <div className="mt-4 p-4 rounded-lg border border-border bg-card flex items-center justify-between">
