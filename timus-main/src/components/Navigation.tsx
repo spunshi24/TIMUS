@@ -18,10 +18,13 @@ const Navigation = () => {
   const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
     if (path.startsWith("#")) {
       e.preventDefault();
+      setIsOpen(false);
       const element = document.querySelector(path);
       if (element) {
         element.scrollIntoView({ behavior: "smooth" });
-        setIsOpen(false);
+      } else {
+        // Not on homepage — navigate there with hash so browser auto-scrolls
+        window.location.href = window.location.origin + import.meta.env.BASE_URL + path;
       }
     }
   };
