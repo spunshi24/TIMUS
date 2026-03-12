@@ -6,6 +6,7 @@ import ChartPanel from "@/components/simulator/ChartPanel";
 import OrderPanel from "@/components/simulator/OrderPanel";
 import PositionsPanel from "@/components/simulator/PositionsPanel";
 import TurboPanel from "@/components/simulator/TurboPanel";
+import WatchlistPanel from "@/components/simulator/WatchlistPanel";
 import AuthModal from "@/components/AuthModal";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
@@ -112,9 +113,9 @@ const Simulator = () => {
   const { toast } = useToast();
   const { user, token } = useAuth();
 
-  const [selectedTicker, setSelectedTicker] = useState("AAPL");
+  const [selectedTicker, setSelectedTicker] = useState("");
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const selectedTickerRef = useRef("AAPL");
+  const selectedTickerRef = useRef("");
 
   const [balance, setBalance] = useState<number>(() =>
     loadFromStorage("timus_balance", 100000)
@@ -160,10 +161,29 @@ const Simulator = () => {
     localStorage.setItem("timus_initial_balance", JSON.stringify(initialBalance));
   }, [initialBalance]);
 
+  // ── Reset to defaults when user logs out ─────────────────────────────────
+  const prevUserRef = useRef(user);
+  useEffect(() => {
+    if (prevUserRef.current !== null && user === null) {
+      setBalance(100000);
+      setInitialBalance(100000);
+      setPositions([]);
+      setOrders([]);
+      selectedTickerRef.current = "";
+      setSelectedTicker("");
+    }
+    prevUserRef.current = user;
+  }, [user]);
+
   // ── Ticker change ───────────────────────────────────────────────────────
   const handleTickerChange = (ticker: string) => {
     selectedTickerRef.current = ticker;
     setSelectedTicker(ticker);
+  };
+
+  const handleShowWatchlist = () => {
+    selectedTickerRef.current = "";
+    setSelectedTicker("");
   };
 
   // ── Balance edit ────────────────────────────────────────────────────────
@@ -543,30 +563,43 @@ const Simulator = () => {
           onTickerChange={handleTickerChange}
           onBalanceChange={handleBalanceChange}
           onAuthClick={() => setAuthModalOpen(true)}
+          onShowWatchlist={handleShowWatchlist}
         />
 
         <div className="container mx-auto px-4 py-8">
-          <div className="grid lg:grid-cols-3 gap-6">
-            {/* Chart + Positions */}
-            <div className="lg:col-span-2 space-y-6">
-              <ChartPanel ticker={selectedTicker} onPriceUpdate={handlePriceUpdate} />
+          {selectedTicker ? (
+            <div className="grid lg:grid-cols-3 gap-6">
+              {/* Chart + Positions */}
+              <div className="lg:col-span-2 space-y-6">
+                <ChartPanel ticker={selectedTicker} onPriceUpdate={handlePriceUpdate} />
+                <PositionsPanel
+                  positions={positionsWithLivePrice}
+                  onClosePosition={handleClosePosition}
+                />
+              </div>
+
+              {/* Order Panel */}
+              <div className="lg:col-span-1">
+                <OrderPanel
+                  ticker={selectedTicker}
+                  balance={balance}
+                  currentPrice={currentPrice}
+                  onPlaceOrder={handlePlaceOrder}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <WatchlistPanel
+                selectedTicker={selectedTicker}
+                onSelectTicker={handleTickerChange}
+              />
               <PositionsPanel
                 positions={positionsWithLivePrice}
                 onClosePosition={handleClosePosition}
               />
             </div>
-
-            {/* Order Panel */}
-            <div className="lg:col-span-1">
-              <OrderPanel
-                ticker={selectedTicker}
-                balance={balance}
-                currentPrice={currentPrice}
-                onPlaceOrder={handlePlaceOrder}
-              />
-            </div>
-          </div>
-
+          )}
         </div>
       </div>
 

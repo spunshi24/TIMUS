@@ -18,6 +18,7 @@ interface SimulatorHeaderProps {
   onTickerChange: (ticker: string) => void;
   onBalanceChange: (balance: number) => void;
   onAuthClick: () => void;
+  onShowWatchlist: () => void;
 }
 
 const SimulatorHeader = ({
@@ -28,6 +29,7 @@ const SimulatorHeader = ({
   onTickerChange,
   onBalanceChange,
   onAuthClick,
+  onShowWatchlist,
 }: SimulatorHeaderProps) => {
   const { user } = useAuth();
   const [isEditingBalance, setIsEditingBalance] = useState(false);
@@ -79,6 +81,7 @@ const SimulatorHeader = ({
 
   const commitTicker = (ticker: string) => {
     setQuery(ticker);
+    setSuggestions([]);
     setShowDropdown(false);
     onTickerChange(ticker.toUpperCase());
   };
@@ -114,7 +117,16 @@ const SimulatorHeader = ({
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
 
           {/* ── Ticker search with autocomplete ─────────────────────────── */}
-          <div className="flex items-center gap-4 flex-1" ref={containerRef}>
+          <div className="flex items-center gap-3 flex-1" ref={containerRef}>
+            {selectedTicker && (
+              <button
+                onClick={onShowWatchlist}
+                className="shrink-0 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                title="Back to watchlist"
+              >
+                ← Watchlist
+              </button>
+            )}
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10 pointer-events-none" />
               <Input

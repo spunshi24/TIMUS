@@ -71,6 +71,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    // Clear portfolio data so simulator resets to $100k on next visit
+    localStorage.removeItem("timus_balance");
+    localStorage.removeItem("timus_initial_balance");
+    localStorage.removeItem("timus_positions");
+    localStorage.removeItem("timus_orders");
+    localStorage.removeItem("timus_anon_trades");
     setUser(null);
     setToken(null);
   };

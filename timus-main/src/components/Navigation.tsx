@@ -9,12 +9,11 @@ const Navigation = () => {
   const { user, logout } = useAuth();
 
   const navItems = [
-    { name: "Home", path: "/" },
     { name: "About", path: "#about" },
-    { name: "Simulator", path: "/simulator" },
-    { name: "Portfolio", path: "/portfolio" },
     { name: "Education", path: "#education" },
     { name: "Contact", path: "#contact" },
+    { name: "Simulator", path: "/simulator" },
+    { name: "Portfolio", path: "/portfolio" },
   ];
 
   const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
