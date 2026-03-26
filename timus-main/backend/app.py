@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import yfinance as yf
 import os
+import re
 import psycopg2
 import psycopg2.extras
 import bcrypt
@@ -52,6 +53,33 @@ def init_db():
             orders JSONB DEFAULT '[]',
             updated_at TIMESTAMP DEFAULT NOW(),
             UNIQUE(user_id)
+        );
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS watchlists (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            ticker TEXT NOT NULL,
+            name TEXT NOT NULL DEFAULT '',
+            added_at TIMESTAMP DEFAULT NOW(),
+            UNIQUE(user_id, ticker)
+        );
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS game_rooms (
+            id SERIAL PRIMARY KEY,
+            code VARCHAR(8) UNIQUE NOT NULL,
+            creator_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            created_at TIMESTAMP DEFAULT NOW()
+        );
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS game_room_members (
+            id SERIAL PRIMARY KEY,
+            game_room_id INTEGER REFERENCES game_rooms(id) ON DELETE CASCADE,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            joined_at TIMESTAMP DEFAULT NOW(),
+            UNIQUE(game_room_id, user_id)
         );
     """)
     conn.commit()
@@ -463,6 +491,212 @@ def save_portfolio():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     return jsonify({"ok": True})
+
+
+# ─── Top 50 by market cap (static list, prices fetched by frontend) ───────────
+
+TOP_50 = [
+    {"ticker": "AAPL",  "name": "Apple Inc."},
+    {"ticker": "MSFT",  "name": "Microsoft Corporation"},
+    {"ticker": "NVDA",  "name": "NVIDIA Corporation"},
+    {"ticker": "GOOGL", "name": "Alphabet Inc. (Class A)"},
+    {"ticker": "AMZN",  "name": "Amazon.com Inc."},
+    {"ticker": "META",  "name": "Meta Platforms Inc."},
+    {"ticker": "TSLA",  "name": "Tesla Inc."},
+    {"ticker": "BRK-B", "name": "Berkshire Hathaway Inc."},
+    {"ticker": "LLY",   "name": "Eli Lilly and Company"},
+    {"ticker": "AVGO",  "name": "Broadcom Inc."},
+    {"ticker": "JPM",   "name": "JPMorgan Chase & Co."},
+    {"ticker": "V",     "name": "Visa Inc."},
+    {"ticker": "UNH",   "name": "UnitedHealth Group Inc."},
+    {"ticker": "XOM",   "name": "Exxon Mobil Corporation"},
+    {"ticker": "WMT",   "name": "Walmart Inc."},
+    {"ticker": "MA",    "name": "Mastercard Incorporated"},
+    {"ticker": "COST",  "name": "Costco Wholesale Corporation"},
+    {"ticker": "PG",    "name": "Procter & Gamble Co."},
+    {"ticker": "JNJ",   "name": "Johnson & Johnson"},
+    {"ticker": "HD",    "name": "The Home Depot Inc."},
+    {"ticker": "ABBV",  "name": "AbbVie Inc."},
+    {"ticker": "ORCL",  "name": "Oracle Corporation"},
+    {"ticker": "CVX",   "name": "Chevron Corporation"},
+    {"ticker": "MRK",   "name": "Merck & Co. Inc."},
+    {"ticker": "BAC",   "name": "Bank of America Corporation"},
+    {"ticker": "KO",    "name": "The Coca-Cola Company"},
+    {"ticker": "PEP",   "name": "PepsiCo Inc."},
+    {"ticker": "TMO",   "name": "Thermo Fisher Scientific Inc."},
+    {"ticker": "ACN",   "name": "Accenture plc"},
+    {"ticker": "CSCO",  "name": "Cisco Systems Inc."},
+    {"ticker": "MCD",   "name": "McDonald's Corporation"},
+    {"ticker": "WFC",   "name": "Wells Fargo & Company"},
+    {"ticker": "ABT",   "name": "Abbott Laboratories"},
+    {"ticker": "NFLX",  "name": "Netflix Inc."},
+    {"ticker": "NOW",   "name": "ServiceNow Inc."},
+    {"ticker": "AMD",   "name": "Advanced Micro Devices Inc."},
+    {"ticker": "LIN",   "name": "Linde plc"},
+    {"ticker": "ADBE",  "name": "Adobe Inc."},
+    {"ticker": "AMGN",  "name": "Amgen Inc."},
+    {"ticker": "PM",    "name": "Philip Morris International Inc."},
+    {"ticker": "GE",    "name": "GE Aerospace"},
+    {"ticker": "ISRG",  "name": "Intuitive Surgical Inc."},
+    {"ticker": "TXN",   "name": "Texas Instruments Incorporated"},
+    {"ticker": "CAT",   "name": "Caterpillar Inc."},
+    {"ticker": "QCOM",  "name": "Qualcomm Incorporated"},
+    {"ticker": "GS",    "name": "The Goldman Sachs Group Inc."},
+    {"ticker": "CRM",   "name": "Salesforce Inc."},
+    {"ticker": "DIS",   "name": "The Walt Disney Company"},
+    {"ticker": "INTC",  "name": "Intel Corporation"},
+    {"ticker": "IBM",   "name": "IBM Corporation"},
+]
+
+
+@app.route("/api/top50", methods=["GET"])
+def get_top50():
+    """Returns the top 50 companies by market cap (names only; prices fetched by frontend)."""
+    return jsonify(TOP_50)
+
+
+# ─── Watchlist routes ─────────────────────────────────────────────────────────
+
+@app.route("/api/watchlist", methods=["GET"])
+@jwt_required()
+def get_watchlist():
+    if not DATABASE_URL:
+        return jsonify({"error": "Database not configured"}), 503
+    user_id = int(get_jwt_identity())
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "SELECT ticker, name, added_at FROM watchlists WHERE user_id = %s ORDER BY added_at ASC",
+            (user_id,)
+        )
+        rows = [dict(r) for r in cur.fetchall()]
+        cur.close()
+        conn.close()
+        return jsonify(rows)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/watchlist/add", methods=["POST"])
+@jwt_required()
+def add_to_watchlist():
+    if not DATABASE_URL:
+        return jsonify({"error": "Database not configured"}), 503
+    user_id = int(get_jwt_identity())
+    data = request.get_json(silent=True) or {}
+    ticker = (data.get("ticker") or "").upper().strip()
+    name = (data.get("name") or ticker).strip()
+    if not ticker:
+        return jsonify({"error": "ticker is required"}), 400
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO watchlists (user_id, ticker, name) VALUES (%s, %s, %s) ON CONFLICT (user_id, ticker) DO NOTHING",
+            (user_id, ticker, name)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"ok": True, "ticker": ticker})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/watchlist/remove", methods=["DELETE"])
+@jwt_required()
+def remove_from_watchlist():
+    if not DATABASE_URL:
+        return jsonify({"error": "Database not configured"}), 503
+    user_id = int(get_jwt_identity())
+    data = request.get_json(silent=True) or {}
+    ticker = (data.get("ticker") or "").upper().strip()
+    if not ticker:
+        return jsonify({"error": "ticker is required"}), 400
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "DELETE FROM watchlists WHERE user_id = %s AND ticker = %s",
+            (user_id, ticker)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ─── Game Room routes ─────────────────────────────────────────────────────────
+
+@app.route("/api/gameroom/create", methods=["POST"])
+@jwt_required()
+def create_game_room():
+    if not DATABASE_URL:
+        return jsonify({"error": "Database not configured"}), 503
+    user_id = int(get_jwt_identity())
+    data = request.get_json(silent=True) or {}
+    code = (data.get("code") or "").upper().strip()
+    if not code:
+        return jsonify({"error": "code is required"}), 400
+    if len(code) != 8:
+        return jsonify({"error": "Code must be exactly 8 characters"}), 400
+    if not re.match(r'^[A-Z0-9]{8}$', code):
+        return jsonify({"error": "Code must contain only letters and numbers"}), 400
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "INSERT INTO game_rooms (code, creator_id) VALUES (%s, %s) RETURNING id, code",
+            (code, user_id)
+        )
+        room = dict(cur.fetchone())
+        cur.execute(
+            "INSERT INTO game_room_members (game_room_id, user_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+            (room["id"], user_id)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"ok": True, "code": room["code"]}), 201
+    except psycopg2.errors.UniqueViolation:
+        return jsonify({"error": "That game code is already taken. Please choose a different one."}), 409
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/gameroom/join", methods=["POST"])
+@jwt_required()
+def join_game_room():
+    if not DATABASE_URL:
+        return jsonify({"error": "Database not configured"}), 503
+    user_id = int(get_jwt_identity())
+    data = request.get_json(silent=True) or {}
+    code = (data.get("code") or "").upper().strip()
+    if not code:
+        return jsonify({"error": "code is required"}), 400
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT id, code FROM game_rooms WHERE code = %s", (code,))
+        room = cur.fetchone()
+        if not room:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Game room not found. Check your code and try again."}), 404
+        room = dict(room)
+        cur.execute(
+            "INSERT INTO game_room_members (game_room_id, user_id) VALUES (%s, %s) ON CONFLICT (game_room_id, user_id) DO NOTHING",
+            (room["id"], user_id)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"ok": True, "code": room["code"]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ─── Startup ──────────────────────────────────────────────────────────────────

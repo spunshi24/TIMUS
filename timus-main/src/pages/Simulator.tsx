@@ -4,9 +4,10 @@ import Navigation from "@/components/Navigation";
 import SimulatorHeader from "@/components/simulator/SimulatorHeader";
 import ChartPanel from "@/components/simulator/ChartPanel";
 import OrderPanel from "@/components/simulator/OrderPanel";
-import PositionsPanel from "@/components/simulator/PositionsPanel";
 import TurboPanel from "@/components/simulator/TurboPanel";
 import WatchlistPanel from "@/components/simulator/WatchlistPanel";
+import CustomWatchlistPanel from "@/components/simulator/CustomWatchlistPanel";
+import GameRoomPanel from "@/components/simulator/GameRoomPanel";
 import AuthModal from "@/components/AuthModal";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
@@ -566,16 +567,12 @@ const Simulator = () => {
           onShowWatchlist={handleShowWatchlist}
         />
 
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-8 space-y-6">
           {selectedTicker ? (
             <div className="grid lg:grid-cols-3 gap-6">
-              {/* Chart + Positions */}
-              <div className="lg:col-span-2 space-y-6">
+              {/* Chart */}
+              <div className="lg:col-span-2">
                 <ChartPanel ticker={selectedTicker} onPriceUpdate={handlePriceUpdate} />
-                <PositionsPanel
-                  positions={positionsWithLivePrice}
-                  onClosePosition={handleClosePosition}
-                />
               </div>
 
               {/* Order Panel */}
@@ -594,12 +591,22 @@ const Simulator = () => {
                 selectedTicker={selectedTicker}
                 onSelectTicker={handleTickerChange}
               />
-              <PositionsPanel
-                positions={positionsWithLivePrice}
-                onClosePosition={handleClosePosition}
-              />
+              {user && (
+                <CustomWatchlistPanel
+                  user={user}
+                  token={token}
+                  onSelectTicker={handleTickerChange}
+                />
+              )}
             </div>
           )}
+
+          {/* Game Room — always visible */}
+          <GameRoomPanel
+            user={user}
+            token={token}
+            onAuthClick={() => setAuthModalOpen(true)}
+          />
         </div>
       </div>
 

@@ -4,7 +4,7 @@ import type { Position } from "@/pages/Simulator";
 
 interface PositionsPanelProps {
   positions: Position[];
-  onClosePosition: (positionId: string) => void;
+  onClosePosition?: (positionId: string) => void;
 }
 
 const PositionsPanel = ({ positions, onClosePosition }: PositionsPanelProps) => {
@@ -58,14 +58,16 @@ const PositionsPanel = ({ positions, onClosePosition }: PositionsPanelProps) => 
                       {position.quantity} shares @ ${position.entryPrice.toFixed(2)}
                     </p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onClosePosition(position.id)}
-                    className="text-muted-foreground hover:text-destructive"
-                  >
-                    <X className="w-5 h-5" />
-                  </Button>
+                  {onClosePosition && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onClosePosition(position.id)}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="w-5 h-5" />
+                    </Button>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
@@ -98,16 +100,18 @@ const PositionsPanel = ({ positions, onClosePosition }: PositionsPanelProps) => 
                   </div>
                 </div>
 
-                <div className="mt-3 pt-3 border-t border-border">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onClosePosition(position.id)}
-                    className="w-full"
-                  >
-                    Close Position
-                  </Button>
-                </div>
+                {onClosePosition && (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onClosePosition(position.id)}
+                      className="w-full"
+                    >
+                      Close Position
+                    </Button>
+                  </div>
+                )}
               </div>
             );
           })}

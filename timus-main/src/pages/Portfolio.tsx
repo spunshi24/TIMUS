@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import { TrendingUp, TrendingDown, RefreshCw, BarChart2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import PositionsPanel from "@/components/simulator/PositionsPanel";
 import type { Position, Order } from "./Simulator";
 import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -73,6 +74,7 @@ function aggregatePositions(positions: Position[]): Map<string, { shares: number
 const Portfolio = () => {
   const { user, token } = useAuth();
   const [holdings, setHoldings] = useState<HoldingRow[]>([]);
+  const [rawPositions, setRawPositions] = useState<Position[]>([]);
   const [cash, setCash] = useState(100000);
   const [initialBalance, setInitialBalance] = useState(100000);
   const [loading, setLoading] = useState(true);
@@ -102,6 +104,7 @@ const Portfolio = () => {
 
     if (positions.length === 0) {
       setHoldings([]);
+      setRawPositions([]);
       setLoading(false);
       return;
     }
@@ -146,6 +149,14 @@ const Portfolio = () => {
     // Sort by market value descending
     rows.sort((a, b) => b.marketValue - a.marketValue);
     setHoldings(rows);
+
+    // Enrich raw positions with live prices for PositionsPanel
+    const priceMap: Record<string, number> = {};
+    rows.forEach((r) => { priceMap[r.ticker] = r.currentPrice; });
+    setRawPositions(
+      positions.map((p) => ({ ...p, currentPrice: priceMap[p.ticker] ?? p.entryPrice }))
+    );
+
     setLastUpdated(new Date());
     setLoading(false);
   };
@@ -498,6 +509,11 @@ const Portfolio = () => {
               <p className="text-sm text-muted-foreground">Available to trade</p>
             </div>
             <p className="text-xl font-bold text-foreground">${fmt(cash)}</p>
+          </div>
+
+          {/* ── Open Positions ────────────────────────────────────────────── */}
+          <div className="mt-4">
+            <PositionsPanel positions={rawPositions} />
           </div>
         </div>
       </div>
