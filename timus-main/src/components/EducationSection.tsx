@@ -200,15 +200,6 @@ const EducationSection = () => {
     { icon: BookOpen, title: "Value Investing", description: "Identify undervalued stocks trading below their intrinsic value for long-term growth" },
   ];
 
-  const chartTypes = [
-    { name: "Candlestick Charts", desc: "Shows open, high, low, close for each period — the industry standard for active traders" },
-    { name: "Line Charts", desc: "Simple closing-price visualization. Good for spotting long-term trends" },
-    { name: "Bar Charts", desc: "OHLC bars showing full price range with open/close ticks on each side" },
-    { name: "Renko Charts", desc: "Filters out time entirely — only plots price movement above a threshold" },
-    { name: "Heikin-Ashi", desc: "Averaged candlesticks that smooth noise and make trends easier to see" },
-    { name: "Point & Figure", desc: "Focuses purely on significant price moves — ignores time and minor fluctuations" },
-  ];
-
   const concepts = [
     {
       title: "Leverage & Margin",
@@ -256,22 +247,6 @@ const EducationSection = () => {
                 <type.icon className="w-9 h-9 text-foreground mb-4" />
                 <h4 className="text-base font-bold text-foreground mb-2">{type.title}</h4>
                 <p className="text-sm text-muted-foreground leading-relaxed">{type.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Chart Types */}
-        <div className="mb-20">
-          <h3 className="text-2xl font-bold text-foreground mb-8 text-center">Understanding Chart Types</h3>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {chartTypes.map((c, i) => (
-              <div key={i} className="p-5 rounded-lg border-2 border-border bg-card hover:shadow-sm transition-all">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-2 h-2 rounded-full bg-foreground" />
-                  <h4 className="font-bold text-foreground text-sm">{c.name}</h4>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">{c.desc}</p>
               </div>
             ))}
           </div>
