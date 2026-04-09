@@ -541,7 +541,7 @@ def get_quote(ticker):
         if div_yield_pct > 25:
             div_yield_pct = None  # almost certainly a data error
 
-        return jsonify({
+        result = {
             "ticker": ticker,
             "name": info.get("longName") or info.get("shortName") or TICKER_INDEX.get(ticker, ticker),
             "price": safe_float(current_price),
