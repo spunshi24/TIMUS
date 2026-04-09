@@ -3,6 +3,9 @@ from flask_cors import CORS
 import yfinance as yf
 import os
 import re
+import time
+import logging
+from collections import OrderedDict
 import psycopg2
 import psycopg2.extras
 import bcrypt
@@ -12,13 +15,57 @@ from flask_jwt_extended import (
     jwt_required, get_jwt_identity,
 )
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=[
+    "https://spunshi24.github.io",
+    "http://localhost:5173",
+    "http://localhost:8080",
+])
 
 # ─── JWT config ──────────────────────────────────────────────────────────────
 app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "dev-secret-change-me")
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False  # tokens don't expire
 jwt = JWTManager(app)
+
+# ─── Cache ───────────────────────────────────────────────────────────────────
+QUOTE_CACHE_DURATION   = 30    # seconds — live prices
+HISTORY_CACHE_DURATION = 60    # seconds — chart OHLCV data
+INFO_CACHE_DURATION    = 3600  # 1 hour  — company metadata
+CACHE_MAX_SIZE         = 500   # entries before LRU eviction
+
+_cache: OrderedDict = OrderedDict()  # key -> (value, expires_at)
+
+
+def cache_get(key: str):
+    entry = _cache.get(key)
+    if entry is None:
+        return None
+    value, expires_at = entry
+    if time.time() > expires_at:
+        _cache.pop(key, None)
+        return None
+    _cache.move_to_end(key)  # mark as recently used
+    return value
+
+
+def cache_set(key: str, value, ttl: int):
+    if key in _cache:
+        _cache.move_to_end(key)
+    _cache[key] = (value, time.time() + ttl)
+    while len(_cache) > CACHE_MAX_SIZE:
+        _cache.popitem(last=False)  # evict oldest
+
+
+# ─── Input validation ─────────────────────────────────────────────────────────
+TICKER_RE = re.compile(r"^[A-Z0-9]{1,5}(-[A-Z])?$")
+
+
+def validate_ticker(t: str) -> bool:
+    return bool(t) and bool(TICKER_RE.match(t.upper()))
+
 
 # ─── Database helpers ────────────────────────────────────────────────────────
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -446,6 +493,14 @@ def get_quote(ticker):
     Falls back gracefully if certain fields are missing.
     """
     ticker = ticker.upper().strip()
+    if not validate_ticker(ticker):
+        return jsonify({"error": "Invalid ticker symbol."}), 400
+
+    cache_key = f"quote:{ticker}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return jsonify(cached)
+
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
@@ -503,8 +558,11 @@ def get_quote(ticker):
             "week52_high": safe_float(info.get("fiftyTwoWeekHigh")),
             "week52_low": safe_float(info.get("fiftyTwoWeekLow")),
             "dividend_yield": div_yield_pct,
-        })
+        }
+        cache_set(cache_key, result, QUOTE_CACHE_DURATION)
+        return jsonify(result)
     except Exception as e:
+        logger.error("get_quote %s: %s", ticker, e)
         return jsonify({"error": str(e)}), 500
 
 
@@ -517,8 +575,16 @@ def get_history(ticker):
     (e.g. weekend, holiday).
     """
     ticker = ticker.upper().strip()
+    if not validate_ticker(ticker):
+        return jsonify({"error": "Invalid ticker symbol."}), 400
+
     period = request.args.get("period", "1d")
     interval = request.args.get("interval", "5m")
+
+    cache_key = f"history:{ticker}:{period}:{interval}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return jsonify(cached)
 
     try:
         stock = yf.Ticker(ticker)
@@ -546,8 +612,11 @@ def get_history(ticker):
                 "volume": int(row["Volume"]),
             })
 
-        return jsonify({"ticker": ticker, "data": data})
+        result = {"ticker": ticker, "data": data}
+        cache_set(cache_key, result, HISTORY_CACHE_DURATION)
+        return jsonify(result)
     except Exception as e:
+        logger.error("get_history %s: %s", ticker, e)
         return jsonify({"error": str(e)}), 500
 
 
@@ -914,4 +983,5 @@ init_db()
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     host = "0.0.0.0" if os.environ.get("PORT") else "127.0.0.1"
-    app.run(debug=False, port=port, host=host)
+    debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    app.run(debug=debug_mode, port=port, host=host)
