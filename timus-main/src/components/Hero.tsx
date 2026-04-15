@@ -1,7 +1,6 @@
-import { ArrowRight, TrendingUp, Shield, Zap } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import heroImage from "@/assets/hero-cyber-trading.jpg";
 
 const Hero = () => {
   return (
@@ -9,72 +8,47 @@ const Hero = () => {
       <div className="absolute inset-0 opacity-10 tech-grid" />
 
       <div className="container mx-auto px-4 relative z-10 pt-20">
-        <div className="max-w-4xl mx-auto text-center space-y-8 animate-fadeIn">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 border-border bg-muted/50 backdrop-blur-sm">
-            <Zap className="w-4 h-4 text-accent" />
-            <span className="text-sm text-foreground/80 font-medium">Trading In Markets Under Simulation</span>
-          </div>
+        <div className="max-w-6xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
 
-          {/* Main Heading */}
-          <h1 className="text-5xl md:text-6xl lg:text-7xl font-semibold text-foreground leading-tight tracking-tight">
-            TiMUS
-          </h1>
-          <p className="text-xl md:text-2xl text-muted-foreground font-light">
-            Your Financial Hub
-          </p>
+            {/* Left: copy + CTAs */}
+            <div className="space-y-8 animate-fadeIn text-center md:text-left">
+              <h1 className="text-5xl md:text-6xl font-semibold text-foreground leading-tight tracking-tight">
+                The trading simulator built for your finance class.
+              </h1>
 
-          {/* Subheading */}
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Live Yahoo Finance data. Zero financial risk. Practice trading stocks and ETFs
-            with real prices — build your skills before putting real money on the line.
-          </p>
+              <p className="text-xl text-muted-foreground font-light leading-relaxed">
+                Real market data. Market, limit, and stop orders. Free forever for students.
+              </p>
 
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-            <Button variant="default" size="lg" className="group" asChild>
-              <Link to="/simulator">
-                Launch Simulator
-                <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </Link>
-            </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => document.querySelector('#about')?.scrollIntoView({ behavior: 'smooth' })}
-            >
-              Learn More
-            </Button>
-          </div>
-
-          {/* Features Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-12">
-            {[
-              {
-                icon: TrendingUp,
-                title: "Live Yahoo Finance Data",
-                description: "Real prices streamed directly from Yahoo Finance — refreshed every 30 seconds"
-              },
-              {
-                icon: Shield,
-                title: "Zero Risk",
-                description: "Practice with virtual funds. Learn without losing real money"
-              },
-              {
-                icon: Zap,
-                title: "Practice Trading Stocks & ETFs",
-                description: "Trade real listed companies and funds — S&P 500, Nasdaq, and more"
-              }
-            ].map((feature, index) => (
-              <div
-                key={index}
-                className="p-6 rounded-lg border-2 border-border bg-card/80 backdrop-blur-sm hover:border-accent/40 transition-all hover:shadow-md group"
-              >
-                <feature.icon className="w-10 h-10 text-accent mb-4" />
-                <h3 className="text-lg font-semibold text-foreground mb-2">{feature.title}</h3>
-                <p className="text-muted-foreground text-sm">{feature.description}</p>
+              <div className="flex flex-col sm:flex-row items-center md:items-start justify-center md:justify-start gap-4">
+                <Button variant="default" size="lg" className="group" asChild>
+                  <Link to="/simulator">
+                    Try the simulator
+                    <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => document.querySelector("#for-professors")?.scrollIntoView({ behavior: "smooth" })}
+                >
+                  For professors
+                </Button>
               </div>
-            ))}
+            </div>
+
+            {/* Right: simulator screenshot */}
+            {/* TODO: drop a real screenshot at public/screenshot-simulator.png */}
+            <div className="flex items-center justify-center">
+              <img
+                src="/screenshot-simulator.png"
+                alt="TiMUS simulator interface"
+                loading="eager"
+                className="rounded-xl border-2 border-border shadow-2xl w-full max-w-lg"
+              />
+            </div>
+
           </div>
         </div>
       </div>

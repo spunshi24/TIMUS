@@ -8,12 +8,9 @@ const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { user, logout } = useAuth();
 
-  const navItems = [
-    { name: "About", path: "#about" },
-    { name: "Education", path: "#education" },
-    { name: "Contact", path: "#contact" },
+  const navLinks = [
     { name: "Simulator", path: "/simulator" },
-    { name: "Portfolio", path: "/portfolio" },
+    { name: "For Professors", path: "#for-professors" },
   ];
 
   const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
@@ -41,7 +38,7 @@ const Navigation = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-1">
-            {navItems.map((item) => (
+            {navLinks.map((item) => (
               <Link
                 key={item.name}
                 to={item.path}
@@ -61,7 +58,7 @@ const Navigation = () => {
               </div>
             ) : (
               <Button variant="default" size="sm" className="ml-4" asChild>
-                <Link to="/simulator">Start Trading</Link>
+                <Link to="/simulator">Sign In</Link>
               </Button>
             )}
           </div>
@@ -78,14 +75,11 @@ const Navigation = () => {
         {/* Mobile Navigation */}
         {isOpen && (
           <div className="md:hidden py-4 border-t border-border">
-            {navItems.map((item) => (
+            {navLinks.map((item) => (
               <Link
                 key={item.name}
                 to={item.path}
-                onClick={(e) => {
-                  scrollToSection(e, item.path);
-                  setIsOpen(false);
-                }}
+                onClick={(e) => { scrollToSection(e, item.path); setIsOpen(false); }}
                 className="block px-4 py-2 text-foreground/80 hover:text-foreground hover:bg-muted transition-all"
               >
                 {item.name}
@@ -102,7 +96,7 @@ const Navigation = () => {
                 </div>
               ) : (
                 <Button variant="default" className="w-full" asChild>
-                  <Link to="/simulator">Start Trading</Link>
+                  <Link to="/simulator" onClick={() => setIsOpen(false)}>Sign In</Link>
                 </Button>
               )}
             </div>

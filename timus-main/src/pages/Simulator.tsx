@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Zap, X } from "lucide-react";
+import { X } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import SimulatorHeader from "@/components/simulator/SimulatorHeader";
 import ChartPanel from "@/components/simulator/ChartPanel";
@@ -175,6 +175,18 @@ const Simulator = () => {
     }
     prevUserRef.current = user;
   }, [user]);
+
+  // ── T key shortcut to toggle Turbo panel ────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "t") return;
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
+      setTurboOpen((prev) => !prev);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // ── Ticker change ───────────────────────────────────────────────────────
   const handleTickerChange = (ticker: string) => {
@@ -601,16 +613,11 @@ const Simulator = () => {
         </div>
       </div>
 
-      {/* Fixed Turbo FAB — always visible while on simulator */}
+      {/* Turbo keyboard hint */}
       {!turboOpen && (
-        <button
-          onClick={() => setTurboOpen(true)}
-          className="fixed bottom-6 right-6 z-30 flex items-center gap-2 px-5 py-3 rounded-full font-bold text-white text-sm bg-yellow-500 hover:bg-yellow-400 active:scale-95 transition-all shadow-2xl"
-          style={{ boxShadow: "0 4px 24px rgba(234,179,8,0.4)" }}
-        >
-          <Zap className="w-4 h-4" />
-          Turbo
-        </button>
+        <div className="fixed bottom-6 right-6 z-30 text-xs text-muted-foreground/50 select-none pointer-events-none">
+          Press <kbd className="font-mono font-semibold">T</kbd> for Quick Trade
+        </div>
       )}
 
       {/* Turbo Panel */}
