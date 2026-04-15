@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X } from "lucide-react";
+import { Zap, X, Mail, Github, Linkedin, Copy, Check } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import SimulatorHeader from "@/components/simulator/SimulatorHeader";
 import ChartPanel from "@/components/simulator/ChartPanel";
@@ -108,6 +108,98 @@ function BlockedModal({ message, onDismiss }: { message: string; onDismiss: () =
   );
 }
 
+// ─── Professor demo contact card ─────────────────────────────────────────────
+const EMAIL = "sumitpunshi@gmail.com";
+
+function DemoContactModal({ onClose }: { onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(EMAIL).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)" }}
+      onClick={onClose}
+    >
+      <div
+        className="relative bg-card rounded-2xl border-2 border-border p-8 max-w-sm w-full text-center"
+        style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="w-14 h-14 rounded-full bg-foreground flex items-center justify-center mx-auto mb-5">
+          <Mail className="w-7 h-7 text-background" />
+        </div>
+
+        <h3 className="text-xl font-bold text-foreground mb-1">Let's set up your demo</h3>
+        <p className="text-sm text-muted-foreground mb-6">
+          Reach out and we'll walk through a live session with your class.
+        </p>
+
+        {/* Email row */}
+        <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-muted border border-border mb-5">
+          <span className="font-mono text-sm font-semibold text-foreground select-all">{EMAIL}</span>
+          <button
+            onClick={handleCopy}
+            className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            title="Copy email"
+          >
+            {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+          </button>
+        </div>
+
+        {/* Social links */}
+        <div className="flex gap-3 mb-5">
+          <button
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-border hover:bg-muted transition-colors text-sm font-medium"
+            onClick={() => (window.location.href = "mailto:" + EMAIL + "?subject=TiMUS%20demo%20request")}
+          >
+            <Mail className="w-4 h-4" />
+            Email
+          </button>
+          <a
+            href="https://github.com/spunshi24"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-border hover:bg-muted transition-colors text-sm font-medium"
+          >
+            <Github className="w-4 h-4" />
+            GitHub
+          </a>
+          <a
+            href="https://www.linkedin.com/in/sumit-punshi"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-border hover:bg-muted transition-colors text-sm font-medium"
+          >
+            <Linkedin className="w-4 h-4" />
+            LinkedIn
+          </a>
+        </div>
+
+        <button
+          className="w-full py-2.5 rounded-lg bg-muted hover:bg-muted/70 text-sm font-semibold transition-colors"
+          onClick={onClose}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 const Simulator = () => {
@@ -134,6 +226,10 @@ const Simulator = () => {
   const [pricesByTicker, setPricesByTicker] = useState<Record<string, number>>({});
   const [turboOpen, setTurboOpen] = useState(false);
   const [blockedMsg, setBlockedMsg] = useState<string | null>(null);
+  const [demoCardOpen, setDemoCardOpen] = useState(false);
+
+  // Detect professor demo flow (?ref=professor in URL)
+  const isProfDemo = new URLSearchParams(window.location.search).get("ref") === "professor";
 
   // Refs — avoid stale closures inside callbacks
   const balanceRef = useRef(balance);
@@ -559,6 +655,16 @@ const Simulator = () => {
     <div className="min-h-screen bg-background">
       <Navigation />
       <div className="pt-16">
+        {/* Professor demo banner */}
+        {isProfDemo && (
+          <div className="bg-zinc-900 border-b border-yellow-500/40 px-4 py-3 text-center">
+            <span className="text-yellow-400 font-semibold text-sm">
+              👋 Professor preview — try a few live trades below. When you're ready to run this with your class, hit the{" "}
+              <strong>DEMO?</strong> button below the trading panel.
+            </span>
+          </div>
+        )}
+
         <SimulatorHeader
           balance={balance}
           initialBalance={initialBalance}
@@ -604,6 +710,18 @@ const Simulator = () => {
             </div>
           )}
 
+          {/* Professor demo CTA — only shown when arriving via ?ref=professor */}
+          {isProfDemo && (
+            <div className="flex justify-center py-2">
+              <button
+                onClick={() => setDemoCardOpen(true)}
+                className="px-8 py-3 bg-black border border-zinc-700 hover:bg-zinc-900 text-white font-bold rounded-xl tracking-wide transition-colors"
+              >
+                DEMO?
+              </button>
+            </div>
+          )}
+
           {/* Game Room — always visible */}
           <GameRoomPanel
             user={user}
@@ -613,11 +731,16 @@ const Simulator = () => {
         </div>
       </div>
 
-      {/* Turbo keyboard hint */}
+      {/* Turbo FAB — press T or click */}
       {!turboOpen && (
-        <div className="fixed bottom-6 right-6 z-30 text-xs text-muted-foreground/50 select-none pointer-events-none">
-          Press <kbd className="font-mono font-semibold">T</kbd> for Quick Trade
-        </div>
+        <button
+          onClick={() => setTurboOpen(true)}
+          className="fixed bottom-6 right-6 z-30 flex items-center gap-2 px-5 py-3 rounded-full font-bold text-white text-sm bg-yellow-500 hover:bg-yellow-400 active:scale-95 transition-all shadow-2xl"
+          style={{ boxShadow: "0 4px 24px rgba(234,179,8,0.4)" }}
+        >
+          <Zap className="w-4 h-4" />
+          Turbo
+        </button>
       )}
 
       {/* Turbo Panel */}
@@ -636,6 +759,9 @@ const Simulator = () => {
       {blockedMsg && (
         <BlockedModal message={blockedMsg} onDismiss={() => setBlockedMsg(null)} />
       )}
+
+      {/* Professor demo contact card */}
+      {demoCardOpen && <DemoContactModal onClose={() => setDemoCardOpen(false)} />}
 
       {/* Auth Modal — shown when anonymous user hits 5-trade limit */}
       <AuthModal

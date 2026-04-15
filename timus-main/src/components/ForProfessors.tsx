@@ -1,5 +1,6 @@
 import { Users, Eye, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
 const bullets = [
   {
@@ -39,11 +40,8 @@ const ForProfessors = () => {
             ))}
           </ul>
 
-          {/* TODO: confirm email before going live */}
           <Button size="lg" asChild>
-            <a href="mailto:sumitpunshi@gmail.com?subject=TiMUS%20demo%20request">
-              Request a 10-minute demo
-            </a>
+            <Link to="/simulator?ref=professor">Request a demo</Link>
           </Button>
         </div>
       </div>

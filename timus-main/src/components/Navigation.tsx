@@ -9,8 +9,11 @@ const Navigation = () => {
   const { user, logout } = useAuth();
 
   const navLinks = [
+    { name: "About", path: "#about" },
     { name: "Simulator", path: "/simulator" },
     { name: "For Professors", path: "#for-professors" },
+    { name: "Portfolio", path: "/portfolio" },
+    { name: "Contact", path: "#contact" },
   ];
 
   const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
