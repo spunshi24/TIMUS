@@ -259,7 +259,7 @@ const Simulator = () => {
   // Load from backend when token becomes available (login / page reload while logged in)
   useEffect(() => {
     if (user && token) loadPortfolioFromBackend();
-  }, [user, token]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, token, loadPortfolioFromBackend]);
 
   // ── Core fill logic ─────────────────────────────────────────────────────
   const fillOrder = useCallback((order: Order, executionPrice: number) => {
@@ -280,7 +280,7 @@ const Simulator = () => {
       setBalance(balanceRef.current);
 
       const newPos: Position = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         ticker: order.ticker,
         quantity: order.quantity,
         entryPrice: executionPrice,
@@ -386,22 +386,25 @@ const Simulator = () => {
     await loadPortfolioFromBackend();
   }, [syncPortfolio, loadPortfolioFromBackend, initialBalance]);
 
-  // ── Place order (entry point from OrderPanel) ──────────────────────────
-  const handlePlaceOrder = (order: Omit<Order, "id" | "status" | "timestamp">) => {
-    // Auth gate: anonymous users capped at 4 free trades
+  // ── Shared order guard (auth cap + market hours) ────────────────────────
+  const guardOrder = (): boolean => {
     if (!user) {
       const anonCount = parseInt(localStorage.getItem("timus_anon_trades") || "0", 10);
       if (anonCount >= 4) {
         setAuthModalOpen(true);
-        return;
+        return false;
       }
     }
-
-    // Market hours gate
     if (!isMarketOpen()) {
       setBlockedMsg("ORDER NOT FILLED — NEW YORK SESSION CLOSED");
-      return;
+      return false;
     }
+    return true;
+  };
+
+  // ── Place order (entry point from OrderPanel) ──────────────────────────
+  const handlePlaceOrder = (order: Omit<Order, "id" | "status" | "timestamp">) => {
+    if (!guardOrder()) return;
 
     const livePrice = pricesByTickerRef.current[order.ticker] ?? 0;
 
@@ -428,7 +431,7 @@ const Simulator = () => {
 
     const newOrder: Order = {
       ...order,
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       status: "pending",
       timestamp: new Date(),
     };
@@ -505,21 +508,9 @@ const Simulator = () => {
 
   // ── Turbo order ────────────────────────────────────────────────────────
   const handleTurboOrder = (side: "buy" | "sell", qty: number, execPrice: number) => {
-    // Auth gate (same as handlePlaceOrder)
-    if (!user) {
-      const anonCount = parseInt(localStorage.getItem("timus_anon_trades") || "0", 10);
-      if (anonCount >= 4) {
-        setAuthModalOpen(true);
-        return;
-      }
-    }
-
-    if (!isMarketOpen()) {
-      setBlockedMsg("ORDER NOT FILLED — NEW YORK SESSION CLOSED");
-      return;
-    }
+    if (!guardOrder()) return;
     const newOrder: Order = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       ticker: selectedTickerRef.current,
       type: "market",
       side,

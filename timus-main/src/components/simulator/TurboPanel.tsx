@@ -35,20 +35,16 @@ export default function TurboPanel({
 
   const livePnL = held > 0 ? (currentPrice - avgEntry) * held : 0;
 
-  // Simulated bid/ask spread: ±$0.01
-  const ask = currentPrice + 0.01;
-  const bid = currentPrice - 0.01;
-
   const clampQty = (v: number) => Math.max(1, Math.floor(v));
 
-  const fire = (side: "buy" | "sell", price: number) => {
-    if (qty <= 0 || price <= 0) return;
-    onOrder(side, qty, price);
+  const fire = (side: "buy" | "sell") => {
+    if (qty <= 0 || currentPrice <= 0) return;
+    onOrder(side, qty, currentPrice);
   };
 
   const closeAll = () => {
     if (held <= 0) return;
-    onOrder("sell", held, bid);
+    onOrder("sell", held, currentPrice);
   };
 
   return (
@@ -83,18 +79,6 @@ export default function TurboPanel({
         </div>
 
         <div className="px-5 py-4 space-y-4">
-          {/* ── Bid / Ask strip ───────────────────────────────────────── */}
-          <div className="grid grid-cols-2 gap-3 text-center text-xs">
-            <div className="bg-green-950/60 border border-green-800/40 rounded-lg p-2">
-              <p className="text-green-400 font-bold text-base">${bid.toFixed(2)}</p>
-              <p className="text-green-600 mt-0.5">Bid</p>
-            </div>
-            <div className="bg-red-950/60 border border-red-800/40 rounded-lg p-2">
-              <p className="text-red-400 font-bold text-base">${ask.toFixed(2)}</p>
-              <p className="text-red-600 mt-0.5">Ask</p>
-            </div>
-          </div>
-
           {/* ── Quantity ──────────────────────────────────────────────── */}
           <div>
             <div className="flex items-center justify-between bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2">
@@ -142,56 +126,19 @@ export default function TurboPanel({
 
           {/* ── Main buttons ──────────────────────────────────────────── */}
           <div className="grid grid-cols-2 gap-3">
-            {/* Row 1 */}
             <button
-              onClick={() => fire("buy", currentPrice)}
+              onClick={() => fire("buy")}
               disabled={currentPrice <= 0}
-              className="py-4 rounded-xl font-bold text-white text-base bg-green-600 hover:bg-green-500 active:scale-95 transition-all disabled:opacity-40"
+              className="py-5 rounded-xl font-bold text-white text-lg bg-green-600 hover:bg-green-500 active:scale-95 transition-all disabled:opacity-40"
             >
-              Buy MKT
+              Buy
             </button>
             <button
-              onClick={() => fire("sell", currentPrice)}
+              onClick={() => fire("sell")}
               disabled={currentPrice <= 0}
-              className="py-4 rounded-xl font-bold text-white text-base bg-rose-600 hover:bg-rose-500 active:scale-95 transition-all disabled:opacity-40"
+              className="py-5 rounded-xl font-bold text-white text-lg bg-rose-600 hover:bg-rose-500 active:scale-95 transition-all disabled:opacity-40"
             >
-              Sell MKT
-            </button>
-
-            {/* Row 2 */}
-            <button
-              onClick={() => fire("buy", ask)}
-              disabled={currentPrice <= 0}
-              className="py-3.5 rounded-xl font-semibold text-white text-sm bg-green-800 hover:bg-green-700 active:scale-95 transition-all disabled:opacity-40"
-            >
-              Buy Ask&nbsp;
-              <span className="text-green-400 text-xs font-bold">${ask.toFixed(2)}</span>
-            </button>
-            <button
-              onClick={() => fire("sell", bid)}
-              disabled={currentPrice <= 0}
-              className="py-3.5 rounded-xl font-semibold text-white text-sm bg-rose-800 hover:bg-rose-700 active:scale-95 transition-all disabled:opacity-40"
-            >
-              Sell Bid&nbsp;
-              <span className="text-rose-400 text-xs font-bold">${bid.toFixed(2)}</span>
-            </button>
-
-            {/* Row 3 */}
-            <button
-              onClick={() => fire("buy", bid)}
-              disabled={currentPrice <= 0}
-              className="py-3 rounded-xl font-semibold text-green-300 text-sm bg-zinc-800 border border-green-800/50 hover:bg-zinc-700 active:scale-95 transition-all disabled:opacity-40"
-            >
-              Buy Bid&nbsp;
-              <span className="text-xs font-bold">${bid.toFixed(2)}</span>
-            </button>
-            <button
-              onClick={() => fire("sell", ask)}
-              disabled={currentPrice <= 0}
-              className="py-3 rounded-xl font-semibold text-rose-300 text-sm bg-zinc-800 border border-rose-800/50 hover:bg-zinc-700 active:scale-95 transition-all disabled:opacity-40"
-            >
-              Sell Ask&nbsp;
-              <span className="text-xs font-bold">${ask.toFixed(2)}</span>
+              Sell
             </button>
           </div>
 
