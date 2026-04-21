@@ -92,9 +92,14 @@ function BlockedModal({ message, onDismiss }: { message: string; onDismiss: () =
             <span className="text-white font-semibold">Monday – Friday, 9:30 AM – 4:00 PM ET</span>
           </p>
         )}
-        {!isMarketClosed && (
+        {message.includes("INSUFFICIENT FUNDS") && (
           <p className="text-zinc-400 text-sm mt-2">
-            Add funds or reduce your order size.
+            Reduce your order size or add more virtual cash.
+          </p>
+        )}
+        {message.includes("INSUFFICIENT SHARES") && (
+          <p className="text-zinc-400 text-sm mt-2">
+            You don&apos;t hold enough shares for this order.
           </p>
         )}
         <button
@@ -371,19 +376,25 @@ const Simulator = () => {
 
   // ── Core fill logic ─────────────────────────────────────────────────────
   const fillOrder = useCallback((order: Order, executionPrice: number) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === order.id ? { ...o, status: "filled" as const } : o))
-    );
+    // Helper: update ordersRef synchronously AND queue the React state update.
+    // Using ordersRef directly (instead of waiting for the useEffect) ensures
+    // that syncPortfolio immediately sees the correct order status.
+    const commitOrderStatus = (status: "filled" | "cancelled") => {
+      const next = ordersRef.current.map((o) =>
+        o.id === order.id ? { ...o, status } : o
+      );
+      ordersRef.current = next;
+      setOrders(next);
+    };
 
     if (order.side === "buy") {
       const cost = executionPrice * order.quantity;
       if (cost > balanceRef.current) {
         setBlockedMsg("ORDER NOT FILLED — INSUFFICIENT FUNDS");
-        setOrders((prev) =>
-          prev.map((o) => (o.id === order.id ? { ...o, status: "cancelled" as const } : o))
-        );
+        commitOrderStatus("cancelled");
         return;
       }
+
       balanceRef.current -= cost;
       setBalance(balanceRef.current);
 
@@ -399,18 +410,20 @@ const Simulator = () => {
       positionsRef.current = [...positionsRef.current, newPos];
       setPositions(positionsRef.current);
 
+      commitOrderStatus("filled");
       toast({
         title: "Order Filled ✓",
         description: `Bought ${order.quantity} ${order.ticker} @ $${executionPrice.toFixed(2)}`,
       });
     } else {
-      // Sell
-      const pos = positionsRef.current.find((p) => p.ticker === order.ticker);
-      if (!pos || pos.quantity < order.quantity) {
+      // ── Sell ──────────────────────────────────────────────────────────
+      // Aggregate total held across ALL position entries for this ticker.
+      const heldEntries = positionsRef.current.filter((p) => p.ticker === order.ticker);
+      const totalHeld = heldEntries.reduce((sum, p) => sum + p.quantity, 0);
+
+      if (totalHeld < order.quantity) {
         setBlockedMsg("ORDER NOT FILLED — INSUFFICIENT SHARES");
-        setOrders((prev) =>
-          prev.map((o) => (o.id === order.id ? { ...o, status: "cancelled" as const } : o))
-        );
+        commitOrderStatus("cancelled");
         return;
       }
 
@@ -418,27 +431,35 @@ const Simulator = () => {
       balanceRef.current += proceeds;
       setBalance(balanceRef.current);
 
-      const updated = positionsRef.current
+      // FIFO deduction: consume from earliest entries first.
+      let toSell = order.quantity;
+      const updatedPositions = positionsRef.current
         .map((p) => {
-          if (p.ticker === order.ticker) {
-            const remaining = p.quantity - order.quantity;
-            return remaining > 0 ? { ...p, quantity: remaining } : null;
-          }
-          return p;
+          if (p.ticker !== order.ticker || toSell === 0) return p;
+          const consume = Math.min(p.quantity, toSell);
+          toSell -= consume;
+          const remaining = p.quantity - consume;
+          return remaining > 0 ? { ...p, quantity: remaining } : null;
         })
         .filter((p): p is Position => p !== null);
 
-      positionsRef.current = updated;
-      setPositions(updated);
+      positionsRef.current = updatedPositions;
+      setPositions(updatedPositions);
 
-      const profit = (executionPrice - pos.entryPrice) * order.quantity;
+      commitOrderStatus("filled");
+
+      // P&L based on weighted-average entry price across all held entries.
+      const totalCost = heldEntries.reduce((s, p) => s + p.entryPrice * p.quantity, 0);
+      const avgEntry = totalHeld > 0 ? totalCost / totalHeld : executionPrice;
+      const profit = (executionPrice - avgEntry) * order.quantity;
       toast({
         title: "Order Filled ✓",
         description: `Sold ${order.quantity} ${order.ticker} @ $${executionPrice.toFixed(2)} — P&L: ${profit >= 0 ? "+" : ""}$${profit.toFixed(2)}`,
       });
     }
 
-    // Post-fill: track anon trades or sync logged-in portfolio
+    // Post-fill: track anon trades or sync logged-in portfolio.
+    // ordersRef.current is already up-to-date (commitOrderStatus ran above).
     if (!user) {
       const prev = parseInt(localStorage.getItem("timus_anon_trades") || "0", 10);
       localStorage.setItem("timus_anon_trades", String(prev + 1));
