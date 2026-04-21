@@ -8,7 +8,7 @@ const Footer = () => {
             <p className="text-gradient-cyber font-bold text-xl mb-1">TiMUS</p>
             <p className="text-sm text-muted-foreground">Trading In Markets Under Simulation</p>
             <p className="text-sm text-muted-foreground mt-3">
-              Built with passion for self learning
+              Paper trading for finance students
             </p>
           </div>
 

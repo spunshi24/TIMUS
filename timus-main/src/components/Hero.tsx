@@ -4,27 +4,32 @@ import { Link } from "react-router-dom";
 
 const Hero = () => {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-background via-muted/30 to-background">
-      <div className="absolute inset-0 opacity-10 tech-grid" />
-
-      <div className="container mx-auto px-4 relative z-10 pt-20">
+    <section className="min-h-screen flex items-center justify-center bg-background border-b border-border">
+      <div className="container mx-auto px-4 pt-20 pb-20">
         <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
+          <div className="grid md:grid-cols-2 gap-16 items-center">
 
-            {/* Left: copy + CTAs */}
-            <div className="space-y-8 animate-fadeIn text-center md:text-left">
-              <h1 className="text-5xl md:text-6xl font-semibold text-foreground leading-tight tracking-tight">
-                The trading simulator built for your finance class.
-              </h1>
-
-              <p className="text-xl text-muted-foreground font-light leading-relaxed">
-                Real market data. Market, limit, and stop orders. Free forever for students.
+            {/* Left: editorial copy */}
+            <div className="space-y-8">
+              <p className="text-xs font-bold tracking-[0.2em] text-muted-foreground uppercase">
+                Paper trading for finance courses
               </p>
 
-              <div className="flex flex-col sm:flex-row items-center md:items-start justify-center md:justify-start gap-4">
+              <h1 className="garamond text-6xl md:text-7xl font-bold text-foreground leading-[1.05]">
+                Trade real stocks.<br />
+                <em className="font-normal text-muted-foreground">Risk nothing.</em>
+              </h1>
+
+              <p className="text-lg text-muted-foreground leading-relaxed max-w-md">
+                Live NYSE & NASDAQ prices. Market, limit, and stop orders.
+                A class leaderboard your professor can watch in real time.
+                Free for every student, forever.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-4">
                 <Button variant="default" size="lg" className="group" asChild>
                   <Link to="/simulator">
-                    Try the simulator
+                    Open the simulator
                     <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </Link>
                 </Button>
@@ -97,8 +102,6 @@ const Hero = () => {
           </div>
         </div>
       </div>
-
-      <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-border to-transparent" />
     </section>
   );
 };

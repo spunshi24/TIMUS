@@ -136,8 +136,8 @@ const BookPopup = ({ onClose }: { onClose: () => void }) => (
         <div className="flex items-center gap-3">
           <BookOpen className="w-6 h-6 text-foreground" />
           <div>
-            <h3 className="text-lg font-bold text-foreground">Recommended Reading</h3>
-            <p className="text-xs text-muted-foreground">{BOOKS.length} books curated for traders & investors</p>
+            <h3 className="text-base font-bold text-foreground">The Reading Room</h3>
+            <p className="text-xs text-muted-foreground">{BOOKS.length} books — investing, trading, psychology, history</p>
           </div>
         </div>
         <button
@@ -224,23 +224,22 @@ const EducationSection = () => {
   ];
 
   return (
-    <section id="education" className="py-24 relative">
+    <section id="education" className="py-24 border-b border-border">
       <div className="container mx-auto px-4">
 
         {/* Header */}
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold mb-4 text-foreground">
-            Financial Education Hub
-          </h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Master the strategies, tools, and psychology behind successful trading
+        <div className="max-w-6xl mx-auto mb-16">
+          <p className="text-xs font-bold tracking-[0.2em] text-muted-foreground uppercase mb-4">
+            The reading room
           </p>
-          <div className="h-1 w-24 bg-foreground mx-auto rounded-full mt-6" />
+          <h2 className="garamond text-4xl md:text-5xl font-bold text-foreground leading-tight">
+            What to know before you trade
+          </h2>
         </div>
 
         {/* Investment Strategies */}
-        <div className="mb-20">
-          <h3 className="text-2xl font-bold text-foreground mb-8 text-center">Investment & Trading Strategies</h3>
+        <div className="max-w-6xl mx-auto mb-20">
+          <h3 className="text-sm font-bold tracking-widest text-muted-foreground uppercase mb-8">Trading Strategies</h3>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
             {investmentTypes.map((type, i) => (
               <div key={i} className="p-6 rounded-lg border-2 border-border bg-card hover:shadow-md transition-all group">
@@ -253,8 +252,8 @@ const EducationSection = () => {
         </div>
 
         {/* Key Concepts */}
-        <div className="mb-20">
-          <h3 className="text-2xl font-bold text-foreground mb-8 text-center">Essential Trading Concepts</h3>
+        <div className="max-w-6xl mx-auto mb-20">
+          <h3 className="text-sm font-bold tracking-widest text-muted-foreground uppercase mb-8">Key Concepts</h3>
           <div className="grid md:grid-cols-2 gap-6">
             {concepts.map((c, i) => (
               <div key={i} className="p-7 rounded-lg border-2 border-border bg-card">
@@ -274,11 +273,11 @@ const EducationSection = () => {
         </div>
 
         {/* Book strip preview */}
-        <div className="mb-12">
-          <h3 className="text-2xl font-bold text-foreground mb-2 text-center">Recommended Reading</h3>
-          <p className="text-sm text-muted-foreground text-center mb-8">
-            {BOOKS.length} hand-picked books across investing, trading, psychology, and market theory
-          </p>
+        <div className="max-w-6xl mx-auto mb-12">
+          <div className="flex items-baseline justify-between mb-8">
+            <h3 className="text-sm font-bold tracking-widest text-muted-foreground uppercase">Recommended Reading</h3>
+            <span className="text-xs text-muted-foreground">{BOOKS.length} titles</span>
+          </div>
           <div className="grid md:grid-cols-3 gap-4 mb-6">
             {BOOKS.slice(0, 3).map((book, i) => (
               <div key={i} className="p-5 rounded-lg border-2 border-border bg-card flex items-start gap-3">
@@ -293,23 +292,12 @@ const EducationSection = () => {
               </div>
             ))}
           </div>
-          <div className="text-center">
+          <div>
             <Button variant="outline" onClick={() => setShowBooks(true)} className="gap-2">
               <BookOpen className="w-4 h-4" />
-              View All {BOOKS.length} Books
+              See all {BOOKS.length} books
             </Button>
           </div>
-        </div>
-
-        {/* CTA */}
-        <div className="text-center pt-4">
-          <p className="text-muted-foreground mb-6 max-w-xl mx-auto text-sm">
-            Knowledge is the foundation of successful trading. Study the concepts above, then apply
-            them risk-free in the TiMUS simulator.
-          </p>
-          <Button variant="default" size="lg" onClick={() => setShowBooks(true)}>
-            Explore Learning Modules
-          </Button>
         </div>
       </div>
 
