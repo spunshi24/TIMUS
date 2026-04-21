@@ -1,307 +1,270 @@
-import { useState } from "react";
-import { BookOpen, TrendingUp, Brain, LineChart, DollarSign, Target, X, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useState, type ReactNode } from "react";
 
-// ── Book list ────────────────────────────────────────────────────────────────
-const BOOKS = [
-  {
-    title: "The Intelligent Investor",
-    author: "Benjamin Graham",
-    category: "Value Investing",
-    note: "The bible of value investing. Warren Buffett calls it the best investing book ever written.",
-  },
-  {
-    title: "A Random Walk Down Wall Street",
-    author: "Burton Malkiel",
-    category: "Market Theory",
-    note: "Classic case for index funds and efficient markets. Essential foundation reading.",
-  },
-  {
-    title: "Trading in the Zone",
-    author: "Mark Douglas",
-    category: "Psychology",
-    note: "The definitive book on trader psychology — why discipline and mindset matter more than strategy.",
-  },
-  {
-    title: "Market Wizards",
-    author: "Jack Schwager",
-    category: "Interviews",
-    note: "Interviews with the world's greatest traders. Raw, honest, and full of real-world insight.",
-  },
-  {
-    title: "The Psychology of Money",
-    author: "Morgan Housel",
-    category: "Behavioral Finance",
-    note: "19 short stories on how people think about money. One of the most readable finance books ever.",
-  },
-  {
-    title: "Technical Analysis of Financial Markets",
-    author: "John Murphy",
-    category: "Technical Analysis",
-    note: "The most comprehensive guide to chart patterns, indicators, and technical trading methods.",
-  },
-  {
-    title: "One Up on Wall Street",
-    author: "Peter Lynch",
-    category: "Stock Picking",
-    note: "Lynch explains how everyday investors can beat Wall Street by investing in what they know.",
-  },
-  {
-    title: "Reminiscences of a Stock Operator",
-    author: "Edwin Lefèvre",
-    category: "Trading Stories",
-    note: "Fictionalized account of Jesse Livermore — still the most gripping trading story ever told.",
-  },
-  {
-    title: "How to Make Money in Stocks",
-    author: "William O'Neil",
-    category: "Growth Investing",
-    note: "Founder of IBD introduces the CAN SLIM system for finding leading growth stocks.",
-  },
-  {
-    title: "The Little Book of Common Sense Investing",
-    author: "John C. Bogle",
-    category: "Index Investing",
-    note: "Vanguard founder's case for low-cost index funds over active management. Short and powerful.",
-  },
-  {
-    title: "Flash Boys",
-    author: "Michael Lewis",
-    category: "Market Structure",
-    note: "Exposes high-frequency trading and how modern markets really work behind the scenes.",
-  },
-  {
-    title: "Security Analysis",
-    author: "Benjamin Graham & David Dodd",
-    category: "Fundamental Analysis",
-    note: "The original textbook for fundamental analysis. Dense but foundational for serious investors.",
-  },
-  {
-    title: "When Genius Failed",
-    author: "Roger Lowenstein",
-    category: "Risk Management",
-    note: "The collapse of Long-Term Capital Management — a masterclass in why leverage kills.",
-  },
-  {
-    title: "Common Stocks and Uncommon Profits",
-    author: "Philip Fisher",
-    category: "Growth Investing",
-    note: "Fisher's qualitative approach to finding exceptional businesses for the long term.",
-  },
-  {
-    title: "The Big Short",
-    author: "Michael Lewis",
-    category: "Finance History",
-    note: "How a handful of outsiders saw the 2008 mortgage crisis coming and bet against Wall Street.",
-  },
-];
+// ── Shared typography helpers ─────────────────────────────────────────────────
+const Kicker = ({ children }: { children: ReactNode }) => (
+  <p className="fraunces text-[11px] text-ered tracking-[2px] uppercase italic mt-7 mb-2">{children}</p>
+);
+const H = ({ children }: { children: ReactNode }) => (
+  <h4 className="fraunces text-[24px] md:text-[26px] tracking-[-0.6px] leading-[1.1] font-medium text-ink mt-1.5 mb-3.5">{children}</h4>
+);
+const P = ({ children }: { children: ReactNode }) => (
+  <p className="fraunces text-[15px] md:text-[16px] leading-[1.6] text-ink mb-3.5">{children}</p>
+);
 
-const CATEGORY_COLORS: Record<string, string> = {
-  "Value Investing":       "bg-blue-100 text-blue-700",
-  "Market Theory":         "bg-purple-100 text-purple-700",
-  "Psychology":            "bg-orange-100 text-orange-700",
-  "Interviews":            "bg-yellow-100 text-yellow-700",
-  "Behavioral Finance":    "bg-pink-100 text-pink-700",
-  "Technical Analysis":    "bg-teal-100 text-teal-700",
-  "Stock Picking":         "bg-green-100 text-green-700",
-  "Trading Stories":       "bg-red-100 text-red-700",
-  "Growth Investing":      "bg-emerald-100 text-emerald-700",
-  "Index Investing":       "bg-cyan-100 text-cyan-700",
-  "Market Structure":      "bg-indigo-100 text-indigo-700",
-  "Fundamental Analysis":  "bg-slate-100 text-slate-700",
-  "Risk Management":       "bg-rose-100 text-rose-700",
-  "Finance History":       "bg-amber-100 text-amber-700",
-};
-
-// ── Book popup ───────────────────────────────────────────────────────────────
-const BookPopup = ({ onClose }: { onClose: () => void }) => (
-  <div
-    className="fixed inset-0 z-50 flex items-center justify-center p-4"
-    style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(6px)" }}
-    onClick={onClose}
-  >
-    <div
-      className="relative bg-card rounded-2xl border-2 border-border w-full max-w-xl flex flex-col"
-      style={{
-        maxHeight: "85vh",
-        boxShadow:
-          "0 40px 80px rgba(0,0,0,0.3), 0 10px 30px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.04)",
-        transform: "perspective(900px) rotateX(1.5deg)",
-        transformOrigin: "top center",
-      }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-5 border-b border-border shrink-0">
-        <div className="flex items-center gap-3">
-          <BookOpen className="w-6 h-6 text-foreground" />
-          <div>
-            <h3 className="text-base font-bold text-foreground">The Reading Room</h3>
-            <p className="text-xs text-muted-foreground">{BOOKS.length} books — investing, trading, psychology, history</p>
-          </div>
-        </div>
-        <button
-          onClick={onClose}
-          className="text-muted-foreground hover:text-foreground transition-colors p-1"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Scrollable list */}
-      <div className="overflow-y-auto flex-1 px-4 py-3">
-        <div className="space-y-2">
-          {BOOKS.map((book, i) => (
-            <div
-              key={i}
-              className="flex items-start gap-4 p-4 rounded-xl border border-border hover:bg-muted/40 transition-colors group"
-            >
-              {/* Number */}
-              <span className="text-xs font-bold text-muted-foreground w-5 shrink-0 mt-0.5">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <h4 className="font-semibold text-foreground text-sm leading-snug">{book.title}</h4>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5 mb-2">{book.author}</p>
-                <p className="text-xs text-muted-foreground leading-relaxed mb-2">{book.note}</p>
-                <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLORS[book.category] ?? "bg-muted text-muted-foreground"}`}>
-                  {book.category}
-                </span>
-              </div>
+// ── Module I ─────────────────────────────────────────────────────────────────
+function FirstTradeBody() {
+  const steps: [string, string, string][] = [
+    ["01", "Fund the desk", "On sign-in, you are handed $100,000 in simulated cash. No card, no wire, no waiting. The cash sits in a margin-free cash account until you decide to deploy it."],
+    ["02", "Pick a name you know", "Novices should begin with a household ticker — AAPL, MSFT, KO. Familiarity reduces the emotional overhead of your first decision. Type the symbol into the search bar; the quote loads in under a second."],
+    ["03", "Read the quote", "A single equity quote has four numbers worth memorising: the bid (what buyers are offering), the ask (what sellers are demanding), the last (the most recent executed price), and the day's volume (conviction). Spread = ask minus bid; the narrower, the more liquid."],
+    ["04", "Choose your order", "A market order executes at the next available price — fast, but you give up the spread. A limit order waits until your price is reached — patient, but may never fill. A stop converts to a market order once a trigger is hit."],
+    ["05", "Size the position", "Professionals risk 1–2% of account equity per trade. With $100,000, that is $1,000–$2,000 of loss you are willing to tolerate. Position size: (risk tolerated) divided by (entry price minus stop price)."],
+    ["06", "Submit and wait", "Hit buy. The order appears in your Working tab until filled, then migrates to Positions. Every fill is timestamped and kept forever — you or your professor can review it."],
+    ["07", "Journal the why", "Before you even see the P&L, write one sentence: why did you buy? This single habit separates disciplined traders from gamblers."],
+  ];
+  return (
+    <div>
+      <Kicker>Walk-through</Kicker>
+      <H>From cold start to your first fill.</H>
+      <P>There is a kind of paralysis unique to new traders, where the sheer quantity of buttons on a brokerage platform convinces you that placing a single order must be complicated. It isn't. The following seven steps cover ninety-five percent of what you will do in your first year.</P>
+      <div>
+        {steps.map(([n, t, d]) => (
+          <div key={n} className="grid grid-cols-[56px_1fr] gap-5 py-[18px] border-t border-ink/15">
+            <span className="fraunces text-[13px] tracking-[2px] text-ered font-bold pt-1">{n}</span>
+            <div>
+              <div className="fraunces text-[20px] md:text-[22px] font-medium tracking-[-0.4px] text-ink mb-1.5">{t}</div>
+              <div className="fraunces text-[14px] md:text-[15px] leading-[1.55] text-ink">{d}</div>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
-
-      {/* Footer */}
-      <div className="px-6 py-4 border-t border-border shrink-0">
-        <p className="text-xs text-muted-foreground text-center">
-          All titles available at major bookstores and Amazon. Start with what matches your trading style.
+      <div className="mt-7 p-5 bg-paper border-[1.5px] border-dashed border-ink/40 fraunces">
+        <p className="text-[11px] text-ered tracking-[2px] uppercase italic mb-1.5">Editor's note</p>
+        <p className="text-[14px] md:text-[15px] leading-[1.6] text-ink">
+          If your first trade loses money, you have done nothing wrong. If your first trade wins and you did not know why it would, you have done something dangerous — you have learned to be lucky.
         </p>
       </div>
     </div>
-  </div>
-);
+  );
+}
 
-// ── Main Component ────────────────────────────────────────────────────────────
-const EducationSection = () => {
-  const [showBooks, setShowBooks] = useState(false);
-
-  const investmentTypes = [
-    { icon: TrendingUp, title: "Day Trading", description: "Buy and sell securities within the same trading day to profit from short-term price movements" },
-    { icon: LineChart, title: "Swing Trading", description: "Hold positions for several days or weeks to capture medium-term price trends" },
-    { icon: Target, title: "Position Trading", description: "Long-term strategy holding investments for months or years based on fundamental analysis" },
-    { icon: DollarSign, title: "Options Trading", description: "Trade contracts giving the right to buy or sell assets at predetermined prices (calls/puts)" },
-    { icon: Brain, title: "Scalping", description: "Make numerous trades throughout the day to profit from small price changes" },
-    { icon: BookOpen, title: "Value Investing", description: "Identify undervalued stocks trading below their intrinsic value for long-term growth" },
+// ── Module II ────────────────────────────────────────────────────────────────
+function StrategiesBody() {
+  const strategies: [string, string, string][] = [
+    ["Day Trading", "Buy and sell within the same trading session. Positions never survive the closing bell. Demands fast decisions, tight stops, and emotional discipline under pressure.", "Horizon: minutes–hours"],
+    ["Swing Trading", "Hold positions for several days to a few weeks, capturing medium-term trends. More forgiving than day trading; the trader sleeps on positions.", "Horizon: days–weeks"],
+    ["Position Trading", "Hold for months or years based on fundamental conviction. Closest to investing. Drawdowns are tolerated for the long thesis to play out.", "Horizon: months–years"],
+    ["Value Investing", "Find businesses trading below their intrinsic worth, then wait. Popularised by Graham and Buffett; requires patience and a tolerance for being early.", "Horizon: years"],
+    ["Options Trading", "Trade contracts that give the right to buy or sell an asset at a set price. Offers defined risk and leverage, but expires — time is always ticking against you.", "Horizon: days–months"],
+    ["Scalping", "Make many small trades per session, each targeting a handful of cents of profit. Only viable for traders with fast execution, tight spreads, and deep focus.", "Horizon: seconds–minutes"],
   ];
+  return (
+    <div>
+      <Kicker>Primer</Kicker>
+      <H>Six philosophies, one market.</H>
+      <P>No style is objectively better. What matters is whether the style matches your temperament, your time, and the capital you can afford to risk. Here are the six most common approaches, in rough order of speed.</P>
+      <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        {strategies.map(([t, d, h]) => (
+          <div key={t} className="p-5 bg-paper border border-ink/20 fraunces">
+            <div className="text-[19px] md:text-[20px] font-medium tracking-[-0.4px] text-ink mb-2">{t}</div>
+            <div className="text-[13px] md:text-[14px] leading-[1.55] text-ink mb-3">{d}</div>
+            <div className="text-[11px] tracking-[1.4px] text-ered uppercase italic">{h}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
+// ── Module III ───────────────────────────────────────────────────────────────
+function ConceptsBody() {
   const concepts = [
     {
-      title: "Leverage & Margin",
-      body: "Leverage lets you control a larger position than your account balance alone. A 2:1 margin means $1 of capital controls $2 of stock. It amplifies both gains and losses — a 50% drop wipes the account at 2:1 leverage.",
-      bullets: ["2:1 leverage = control $2 with $1 of capital", "Margin call triggers if equity falls below requirement", "Most brokers offer 4:1 intraday margin for day traders"],
+      t: "Leverage & Margin",
+      p: "Leverage lets you control a larger position than your cash alone would permit. A 2:1 margin account turns $1 of your capital into $2 of buying power. The trade-off is symmetric: gains and losses are both multiplied. A 50% adverse move wipes out a 2:1 account.",
+      b: ["2:1 leverage = $1 controls $2 of stock", "Margin calls trigger when equity falls below the maintenance requirement", "Intraday margin for pattern day traders is commonly 4:1 in US brokerages"],
     },
     {
-      title: "Options: Calls & Puts",
-      body: "An option is a contract giving the right — but not obligation — to buy or sell a stock at a set price (strike) before expiration. Calls profit when price rises; puts profit when it falls.",
-      bullets: ["Call = right to BUY at the strike price", "Put = right to SELL at the strike price", "Max loss on a long option is the premium paid"],
+      t: "Options — Calls & Puts",
+      p: "An option is a contract granting the right (not the obligation) to buy or sell a stock at a specified strike price before an expiration date. A call profits if the stock rises above the strike; a put profits if it falls below. The most you can lose buying an option is the premium you paid.",
+      b: ["Call = right to buy at the strike", "Put = right to sell at the strike", "Premium paid = maximum loss on a long option position"],
     },
     {
-      title: "Market Sessions",
-      body: "US equity markets run in three sessions. Liquidity and volatility differ significantly across them. Most retail traders should stick to regular hours for tighter spreads.",
-      bullets: ["Pre-market: 4:00 AM – 9:30 AM ET", "Regular hours: 9:30 AM – 4:00 PM ET", "After-hours: 4:00 PM – 8:00 PM ET"],
+      t: "Market Sessions",
+      p: "US equity markets trade in three sessions. Regular hours (09:30–16:00 ET) carry the bulk of volume and the tightest spreads. Pre- and after-market hours exist for news reactions but with thin liquidity.",
+      b: ["Pre-market: 04:00–09:30 ET", "Regular: 09:30–16:00 ET", "After-hours: 16:00–20:00 ET"],
     },
     {
-      title: "Risk Management",
-      body: "Protecting capital is more important than maximizing returns. Professional traders risk a fixed percentage of their account per trade, never more — regardless of conviction.",
-      bullets: ["Risk no more than 1–2% of capital per trade", "Use stop-loss orders on every position", "Diversify across sectors to reduce correlated risk"],
+      t: "Risk Management",
+      p: "Preserving capital is the first duty of a trader. Professionals fix the percentage of equity they risk per trade — often 1%, rarely more than 2% — regardless of how confident they feel. Conviction without risk control is how accounts die.",
+      b: ["Risk no more than 1–2% of capital per trade", "Stop-losses on every position, without exception", "Diversify across uncorrelated sectors"],
     },
   ];
+  return (
+    <div>
+      <Kicker>Reference</Kicker>
+      <H>Four concepts that pay their rent.</H>
+      <P>Master these four and you will understand ninety percent of what you read on the business page. The rest are refinements.</P>
+      <div>
+        {concepts.map((c) => (
+          <div key={c.t} className="py-[22px] border-t border-ink/20 fraunces">
+            <div className="text-[22px] md:text-[24px] font-medium tracking-[-0.5px] text-ink mb-2.5">{c.t}</div>
+            <P>{c.p}</P>
+            <ul className="pl-4 m-0 space-y-1">
+              {c.b.map((x, j) => (
+                <li key={j} className="text-[13px] md:text-[14px] leading-[1.55] text-dim italic">{x}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Module IV ────────────────────────────────────────────────────────────────
+function ReadingBody() {
+  const books: [string, string, string][] = [
+    ["The Intelligent Investor", "Benjamin Graham", "Value"],
+    ["A Random Walk Down Wall Street", "Burton Malkiel", "Theory"],
+    ["Trading in the Zone", "Mark Douglas", "Psychology"],
+    ["Market Wizards", "Jack Schwager", "Interviews"],
+    ["The Psychology of Money", "Morgan Housel", "Behavioural"],
+    ["Technical Analysis of Financial Markets", "John Murphy", "Technical"],
+    ["One Up on Wall Street", "Peter Lynch", "Stock Picking"],
+    ["Reminiscences of a Stock Operator", "Edwin Lefevre", "Classic"],
+    ["How to Make Money in Stocks", "William O'Neil", "Growth"],
+    ["The Little Book of Common Sense Investing", "John C. Bogle", "Index"],
+    ["Flash Boys", "Michael Lewis", "Structure"],
+    ["Security Analysis", "Graham & Dodd", "Fundamental"],
+    ["When Genius Failed", "Roger Lowenstein", "Risk"],
+    ["Common Stocks and Uncommon Profits", "Philip Fisher", "Growth"],
+    ["The Big Short", "Michael Lewis", "History"],
+  ];
+  return (
+    <div>
+      <Kicker>Library</Kicker>
+      <H>Fifteen books. Start with what matches your style.</H>
+      <P>Every serious trader has read most of these. No investment newsletter, blog, or YouTube channel can substitute. Start with the category that sounds least like you — the gaps are the point.</P>
+      <div className="mt-3.5" style={{ columnCount: 2, columnGap: 28 }}>
+        {books.map(([t, a, cat], i) => (
+          <div
+            key={t}
+            className="fraunces py-3.5 flex gap-3.5"
+            style={{ breakInside: "avoid", borderTop: i < 2 ? "none" : "1px dotted rgba(26,22,19,0.25)" }}
+          >
+            <span className="text-[12px] text-dim pt-0.5 shrink-0" style={{ fontVariantNumeric: "tabular-nums" }}>
+              {String(i + 1).padStart(2, "0")}
+            </span>
+            <div>
+              <div className="text-[15px] md:text-[17px] font-medium tracking-[-0.3px] leading-[1.2] text-ink">{t}</div>
+              <div className="text-[12px] md:text-[13px] text-dim italic mt-0.5">
+                {a} · <span className="text-ered not-italic">{cat}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Module registry ──────────────────────────────────────────────────────────
+const MODULES = [
+  { id: "first-trade", kicker: "Module I",   title: "Your First Trade",    subtitle: "A walk-through from signup to fill — in ten minutes.",         read: "8 min",   kind: "Walk-through", Body: FirstTradeBody },
+  { id: "strategies",  kicker: "Module II",  title: "Styles of the Trade", subtitle: "Day, swing, position, value — six philosophies in contrast.",   read: "6 min",   kind: "Primer",       Body: StrategiesBody },
+  { id: "concepts",    kicker: "Module III", title: "Essential Concepts",   subtitle: "Leverage, options, sessions, risk — plain-English definitions.",read: "9 min",   kind: "Reference",    Body: ConceptsBody },
+  { id: "reading",     kicker: "Module IV",  title: "The Reading Room",     subtitle: "Fifteen books that actually matter, by category.",             read: "Curated", kind: "Library",      Body: ReadingBody },
+];
+
+// ── Main section ─────────────────────────────────────────────────────────────
+const EducationSection = () => {
+  const [openId, setOpenId] = useState("first-trade");
+  const active = MODULES.find((m) => m.id === openId)!;
 
   return (
-    <section id="education" className="py-24 border-b border-border">
-      <div className="container mx-auto px-4">
+    <section id="education" className="px-8 md:px-14 py-24 bg-paper border-t-[1.5px] border-ink">
 
-        {/* Header */}
-        <div className="max-w-6xl mx-auto mb-16">
-          <p className="text-xs font-bold tracking-[0.2em] text-muted-foreground uppercase mb-4">
-            The reading room
-          </p>
-          <h2 className="garamond text-4xl md:text-5xl font-bold text-foreground leading-tight">
-            What to know before you trade
+      {/* Section header */}
+      <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-14 border-b-[1.5px] border-ink pb-5 gap-4">
+        <div>
+          <p className="fraunces text-[11px] text-ered tracking-[3px] uppercase italic mb-2.5">§ Education Hub</p>
+          <h2 className="fraunces text-[52px] md:text-[76px] tracking-[-2.2px] leading-[0.95] font-medium text-ink">
+            The Reading Room.
           </h2>
         </div>
-
-        {/* Investment Strategies */}
-        <div className="max-w-6xl mx-auto mb-20">
-          <h3 className="text-sm font-bold tracking-widest text-muted-foreground uppercase mb-8">Trading Strategies</h3>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {investmentTypes.map((type, i) => (
-              <div key={i} className="p-6 rounded-lg border-2 border-border bg-card hover:shadow-md transition-all group">
-                <type.icon className="w-9 h-9 text-foreground mb-4" />
-                <h4 className="text-base font-bold text-foreground mb-2">{type.title}</h4>
-                <p className="text-sm text-muted-foreground leading-relaxed">{type.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Key Concepts */}
-        <div className="max-w-6xl mx-auto mb-20">
-          <h3 className="text-sm font-bold tracking-widest text-muted-foreground uppercase mb-8">Key Concepts</h3>
-          <div className="grid md:grid-cols-2 gap-6">
-            {concepts.map((c, i) => (
-              <div key={i} className="p-7 rounded-lg border-2 border-border bg-card">
-                <h4 className="text-lg font-bold text-foreground mb-3">{c.title}</h4>
-                <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{c.body}</p>
-                <ul className="space-y-1.5">
-                  {c.bullets.map((b, j) => (
-                    <li key={j} className="flex items-start gap-2 text-xs text-muted-foreground">
-                      <div className="w-1.5 h-1.5 rounded-full bg-foreground shrink-0 mt-1" />
-                      {b}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Book strip preview */}
-        <div className="max-w-6xl mx-auto mb-12">
-          <div className="flex items-baseline justify-between mb-8">
-            <h3 className="text-sm font-bold tracking-widest text-muted-foreground uppercase">Recommended Reading</h3>
-            <span className="text-xs text-muted-foreground">{BOOKS.length} titles</span>
-          </div>
-          <div className="grid md:grid-cols-3 gap-4 mb-6">
-            {BOOKS.slice(0, 3).map((book, i) => (
-              <div key={i} className="p-5 rounded-lg border-2 border-border bg-card flex items-start gap-3">
-                <BookOpen className="w-7 h-7 text-muted-foreground shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-bold text-foreground text-sm leading-snug">{book.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{book.author}</p>
-                  <span className={`inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLORS[book.category] ?? "bg-muted text-muted-foreground"}`}>
-                    {book.category}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div>
-            <Button variant="outline" onClick={() => setShowBooks(true)} className="gap-2">
-              <BookOpen className="w-4 h-4" />
-              See all {BOOKS.length} books
-            </Button>
-          </div>
-        </div>
+        <p className="fraunces text-[14px] text-dim md:max-w-[360px] md:text-right italic">
+          Four modules. Pick one, click to open. Everything you need to start trading with intention.
+        </p>
       </div>
 
-      {showBooks && <BookPopup onClose={() => setShowBooks(false)} />}
+      {/* Index + expanded panel */}
+      <div className="grid md:grid-cols-[340px_1fr] gap-10 items-start">
+
+        {/* Module index */}
+        <div className="border-t border-ink/20">
+          {MODULES.map((m) => {
+            const isActive = openId === m.id;
+            return (
+              <button
+                key={m.id}
+                onClick={() => setOpenId(m.id)}
+                className={`block w-full text-left px-5 py-[22px] border-b border-ink/20 transition-colors fraunces ${
+                  isActive ? "bg-paper-deep" : "bg-transparent hover:bg-paper-dark"
+                }`}
+              >
+                <div className="flex justify-between items-baseline mb-1">
+                  <span className={`text-[11px] tracking-[2px] uppercase italic ${isActive ? "text-ered font-bold" : "text-dim"}`}>
+                    {m.kicker}
+                  </span>
+                  <span className="text-[10px] tracking-[1.4px] text-dim uppercase">{m.kind} · {m.read}</span>
+                </div>
+                <div className={`text-[22px] md:text-[24px] tracking-[-0.6px] leading-[1.1] text-ink mb-1 ${isActive ? "font-semibold italic" : "font-medium"}`}>
+                  {m.title}
+                  {isActive && <span className="text-ered ml-2 not-italic">&#8594;</span>}
+                </div>
+                <div className="text-[13px] text-dim leading-[1.4]">{m.subtitle}</div>
+              </button>
+            );
+          })}
+          <p className="px-5 py-[18px] fraunces text-[12px] text-dim tracking-[1px] italic">
+            More modules in preparation — post-mortems of famous trades, the psychology of drawdowns.
+          </p>
+        </div>
+
+        {/* Expanded content panel */}
+        <div className="border-[1.5px] border-ink bg-paper-dark p-8 md:p-12 overflow-y-auto" style={{ maxHeight: 820 }}>
+          <div className="flex justify-between items-baseline border-b-[1.5px] border-ink pb-4 mb-[18px]">
+            <div>
+              <p className="fraunces text-[11px] text-ered tracking-[2px] uppercase italic mb-1">
+                {active.kicker} · {active.kind}
+              </p>
+              <h3 className="fraunces text-[32px] md:text-[40px] font-medium tracking-[-1.2px] leading-none text-ink">
+                {active.title}
+              </h3>
+            </div>
+            <span className="fraunces text-[11px] tracking-[1.4px] text-dim uppercase hidden md:block shrink-0 ml-4">
+              Reading time · {active.read}
+            </span>
+          </div>
+
+          <active.Body />
+
+          <div className="mt-10 pt-5 border-t-[1.5px] border-ink flex justify-between items-center">
+            <span className="fraunces text-[12px] tracking-[1.4px] text-dim uppercase">End of {active.kicker}</span>
+            <button
+              onClick={() => {
+                const idx = MODULES.findIndex((x) => x.id === openId);
+                setOpenId(MODULES[(idx + 1) % MODULES.length].id);
+              }}
+              className="bg-ink text-paper fraunces px-5 py-3 text-[12px] tracking-[1.5px] uppercase cursor-pointer border-none"
+            >
+              Next module &#8594;
+            </button>
+          </div>
+        </div>
+
+      </div>
     </section>
   );
 };

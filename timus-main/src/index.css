@@ -7,6 +7,11 @@
   font-family: "EB Garamond", Georgia, serif;
 }
 
+/* Fraunces — editorial serif for the landing page */
+.fraunces {
+  font-family: "Fraunces", Georgia, serif;
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */

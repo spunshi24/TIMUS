@@ -1,36 +1,40 @@
-const Footer = () => {
-  return (
-    <footer className="border-t border-primary/20 py-10 bg-card/20 backdrop-blur-sm">
-      <div className="container mx-auto px-4">
-        <div className="flex flex-col md:flex-row items-start justify-between gap-8">
-          {/* Left — brand */}
-          <div>
-            <p className="text-gradient-cyber font-bold text-xl mb-1">TiMUS</p>
-            <p className="text-sm text-muted-foreground">Trading In Markets Under Simulation</p>
-            <p className="text-sm text-muted-foreground mt-3">
-              Paper trading for finance students
-            </p>
-          </div>
+const Footer = () => (
+  <section className="px-8 md:px-14 py-24 md:py-32 bg-paper border-t-[1.5px] border-ink text-center">
 
-          {/* Right — founder */}
-          <div className="text-left md:text-right">
-            <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1">Founder &amp; CEO</p>
-            <p className="garamond text-lg font-semibold text-foreground italic">Sumit Punshi</p>
-            <p className="text-xs text-muted-foreground mt-3">
-              © {new Date().getFullYear()} TiMUS. Self learning purposes only.
-            </p>
-          </div>
-        </div>
+    {/* Kicker */}
+    <p className="fraunces text-[11px] text-ered tracking-[4px] uppercase mb-7">Closing Bell</p>
 
-        <div className="mt-8 pt-6 border-t border-primary/10 text-center">
-          <p className="text-xs text-muted-foreground">
-            <span className="text-primary">⚠️ Disclaimer:</span> TiMUS is a simulated trading platform for self learning purposes only.
-            No real money is involved. Past performance does not guarantee future results.
-          </p>
-        </div>
-      </div>
-    </footer>
-  );
-};
+    {/* Big headline */}
+    <h2 className="fraunces font-[400] text-[60px] md:text-[96px] lg:text-[120px] tracking-[-2px] md:tracking-[-3.4px] leading-[0.92] text-ink max-w-[1100px] mx-auto">
+      Learn by doing.<br />
+      <em className="text-ered">Not</em> by losing.
+    </h2>
+
+    {/* Close paragraph */}
+    <p className="fraunces text-[16px] md:text-[18px] max-w-[620px] mx-auto mt-7 text-dim leading-[1.55] italic">
+      Free forever, for the self-taught and for the classroom. Built by someone who learned trading on paper with his father — and wanted better for you.
+    </p>
+
+    {/* CTAs */}
+    <div className="mt-10 flex justify-center gap-3.5 flex-wrap">
+      <a href="/simulator">
+        <button className="bg-ink text-paper fraunces px-8 py-[18px] text-[13px] tracking-[1.5px] uppercase cursor-pointer border-none">
+          Open the floor →
+        </button>
+      </a>
+      <a href="mailto:sumitpunshi@gmail.com">
+        <button className="bg-transparent text-ink border-[1.5px] border-ink fraunces px-8 py-[17px] text-[13px] tracking-[1.5px] uppercase cursor-pointer">
+          Email the founder
+        </button>
+      </a>
+    </div>
+
+    {/* Copyright */}
+    <p className="fraunces text-[12px] tracking-[2px] uppercase text-dim mt-18 pt-16 border-t border-ink/20">
+      TiMUS · Trading in Markets Under Simulation · © MMXXVI · Sumit Punshi, Founder
+    </p>
+
+  </section>
+);
 
 export default Footer;

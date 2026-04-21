@@ -1,55 +1,42 @@
-import { DollarSign, BarChart2, Trophy } from "lucide-react";
-
-const steps = [
+const CHAPTERS = [
   {
-    icon: DollarSign,
-    step: "01",
-    title: "Get $100,000 in virtual cash",
-    description: "Start with a simulated portfolio — no real money at risk.",
+    kicker: "Chapter I",
+    title: "Opening Bell",
+    desc: 'Fund a virtual portfolio with $100,000. Ten seconds from signup to first trade — no integrations, no credit card, no "book a call."',
   },
   {
-    icon: BarChart2,
-    step: "02",
-    title: "Trade real stocks with live NYSE & NASDAQ prices",
-    description:
-      "Place market, limit, and stop orders on actual listed companies. Prices refresh every 30 seconds.",
+    kicker: "Chapter II",
+    title: "The Tape",
+    desc: "Prices are not made up. Market, limit, and stop orders route against real NYSE and NASDAQ quotes that refresh every thirty seconds.",
   },
   {
-    icon: Trophy,
-    step: "03",
-    title: "Your whole class trades in the same room",
-    description:
-      "Everyone sees the leaderboard. Your professor sees every position and every trade.",
+    kicker: "Chapter III",
+    title: "Alone or Together",
+    desc: "Study solo at your own pace — or join a class room with a five-character code. Your instructor sees every position and every fill.",
   },
 ];
 
-const HowItWorks = () => {
-  return (
-    <section className="py-24 border-b border-border">
-      <div className="container mx-auto px-4">
-        <div className="max-w-6xl mx-auto">
-
-          <p className="text-xs font-bold tracking-[0.2em] text-muted-foreground uppercase mb-16">
-            How it works
-          </p>
-
-          <div className="grid md:grid-cols-3 gap-12">
-            {steps.map(({ icon: Icon, step, title, description }) => (
-              <div key={step}>
-                <span className="garamond text-6xl font-bold text-muted-foreground/25 block mb-4 leading-none">
-                  {step}
-                </span>
-                <Icon className="w-7 h-7 text-accent mb-4" />
-                <h3 className="text-base font-semibold text-foreground mb-2 leading-snug">{title}</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">{description}</p>
-              </div>
-            ))}
-          </div>
-
+const HowItWorks = () => (
+  <section className="px-8 md:px-14 py-20 bg-paper border-t-[1.5px] border-b-[1.5px] border-ink">
+    <div className="grid md:grid-cols-3 max-w-none">
+      {CHAPTERS.map(({ kicker, title, desc }, i) => (
+        <div
+          key={kicker}
+          className={[
+            "py-10 md:py-0",
+            i > 0 ? "md:pl-9" : "",
+            i < CHAPTERS.length - 1 ? "md:pr-9 border-b border-ink/20 md:border-b-0 md:border-r md:border-ink" : "",
+          ].join(" ")}
+        >
+          <p className="fraunces text-[11px] text-ered tracking-[2px] uppercase italic mb-3.5">{kicker}</p>
+          <h3 className="fraunces text-[32px] md:text-[38px] tracking-[-1px] leading-none text-ink font-medium">
+            {title}
+          </h3>
+          <p className="fraunces text-[15px] md:text-base leading-[1.55] text-ink mt-[18px]">{desc}</p>
         </div>
-      </div>
-    </section>
-  );
-};
+      ))}
+    </div>
+  </section>
+);
 
 export default HowItWorks;

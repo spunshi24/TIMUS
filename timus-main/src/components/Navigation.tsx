@@ -1,112 +1,112 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Menu, X, LogOut } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { user, logout } = useAuth();
 
-  const navLinks = [
-    { name: "About", path: "#about" },
-    { name: "Simulator", path: "/simulator" },
-    { name: "For Professors", path: "#for-professors" },
-    { name: "Portfolio", path: "/portfolio" },
-    { name: "Contact", path: "#contact" },
-  ];
+  const dateStr = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 
-  const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
-    if (path.startsWith("#")) {
-      e.preventDefault();
-      setIsOpen(false);
-      const element = document.querySelector(path);
-      if (element) {
-        element.scrollIntoView({ behavior: "smooth" });
-      } else {
-        // Not on homepage — navigate there with hash so browser auto-scrolls
-        window.location.href = window.location.origin + import.meta.env.BASE_URL + path;
-      }
-    }
+  const scrollTo = (id: string) => {
+    setIsOpen(false);
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-b border-border shadow-sm">
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
-            <span className="text-2xl font-bold text-foreground">TiMUS</span>
-          </Link>
+    <div className="fixed top-0 left-0 right-0 z-50">
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-1">
-            {navLinks.map((item) => (
-              <Link
-                key={item.name}
-                to={item.path}
-                onClick={(e) => scrollToSection(e, item.path)}
-                className="px-4 py-2 text-foreground/80 hover:text-foreground transition-colors duration-300 font-medium"
-              >
-                {item.name}
-              </Link>
-            ))}
+      {/* ── Main masthead bar ─────────────────────────────────────────── */}
+      <div className="bg-paper border-b-[1.5px] border-ink">
+
+        {/* Desktop 3-col layout */}
+        <div className="hidden md:grid grid-cols-[1fr_auto_1fr] items-center px-14 py-[18px]">
+          <span className="fraunces text-[11px] tracking-[2.5px] text-dim uppercase">
+            Vol. IV · No. 112 · {dateStr}
+          </span>
+          <Link to="/" className="fraunces text-[28px] font-bold italic text-ink leading-none tracking-[-0.5px]">
+            TiMUS
+          </Link>
+          <div className="flex justify-end items-center gap-5 fraunces text-[11px] tracking-[1.4px] uppercase">
+            <Link to="/simulator" className="text-ink hover:text-ered transition-colors">Floor</Link>
+            <button onClick={() => scrollTo("education")} className="text-ink hover:text-ered transition-colors">Reading Room</button>
+            <button onClick={() => scrollTo("for-professors")} className="text-ink hover:text-ered transition-colors">For Faculty</button>
             {user ? (
-              <div className="flex items-center gap-3 ml-4">
-                <span className="text-sm text-foreground/80 font-medium">{user.username}</span>
-                <Button variant="outline" size="sm" onClick={logout} className="gap-1.5">
-                  <LogOut className="w-3.5 h-3.5" />
-                  Logout
-                </Button>
-              </div>
+              <>
+                <span className="text-dim">{user.username}</span>
+                <button
+                  onClick={logout}
+                  className="text-ink border-b border-ink pb-0.5 hover:text-ered hover:border-ered transition-colors flex items-center gap-1"
+                >
+                  <LogOut className="w-3 h-3" /> Logout
+                </button>
+              </>
             ) : (
-              <Button variant="default" size="sm" className="ml-4" asChild>
-                <Link to="/simulator">Sign In</Link>
-              </Button>
+              <Link
+                to="/simulator"
+                className="text-ink border-b border-ink pb-0.5 hover:text-ered hover:border-ered transition-colors"
+              >
+                Enroll
+              </Link>
             )}
           </div>
-
-          {/* Mobile menu button */}
-          <button
-            className="md:hidden text-foreground"
-            onClick={() => setIsOpen(!isOpen)}
-          >
-            {isOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
         </div>
 
-        {/* Mobile Navigation */}
-        {isOpen && (
-          <div className="md:hidden py-4 border-t border-border">
-            {navLinks.map((item) => (
-              <Link
-                key={item.name}
-                to={item.path}
-                onClick={(e) => { scrollToSection(e, item.path); setIsOpen(false); }}
-                className="block px-4 py-2 text-foreground/80 hover:text-foreground hover:bg-muted transition-all"
-              >
-                {item.name}
-              </Link>
-            ))}
-            <div className="px-4 pt-4">
-              {user ? (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-foreground/80 font-medium">{user.username}</span>
-                  <Button variant="outline" size="sm" onClick={() => { logout(); setIsOpen(false); }} className="gap-1.5">
-                    <LogOut className="w-3.5 h-3.5" />
-                    Logout
-                  </Button>
-                </div>
-              ) : (
-                <Button variant="default" className="w-full" asChild>
-                  <Link to="/simulator" onClick={() => setIsOpen(false)}>Sign In</Link>
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Mobile bar */}
+        <div className="md:hidden flex items-center justify-between px-6 py-[18px]">
+          <Link to="/" className="fraunces text-2xl font-bold italic text-ink">TiMUS</Link>
+          <button onClick={() => setIsOpen(!isOpen)} className="text-ink p-1">
+            {isOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
       </div>
-    </nav>
+
+      {/* ── Masthead strip (desktop only) ─────────────────────────────── */}
+      <div className="hidden md:flex bg-paper border-b border-ink/30 px-14 py-[14px] justify-between fraunces text-[11px] tracking-[1.2px] uppercase text-dim">
+        <span>Opening Bell 09:30 ET</span>
+        <span>Since MMXXIV · Free forever for learners &amp; classes</span>
+        <span>Est. reading 4 min</span>
+      </div>
+
+      {/* ── Mobile dropdown ───────────────────────────────────────────── */}
+      {isOpen && (
+        <div className="md:hidden bg-paper border-b-[1.5px] border-ink px-6 py-4 space-y-1">
+          <Link
+            to="/simulator"
+            onClick={() => setIsOpen(false)}
+            className="block fraunces text-[11px] tracking-[1.4px] uppercase text-ink py-2.5 border-b border-ink/20"
+          >Floor</Link>
+          <button
+            onClick={() => scrollTo("education")}
+            className="block w-full text-left fraunces text-[11px] tracking-[1.4px] uppercase text-ink py-2.5 border-b border-ink/20"
+          >Reading Room</button>
+          <button
+            onClick={() => scrollTo("for-professors")}
+            className="block w-full text-left fraunces text-[11px] tracking-[1.4px] uppercase text-ink py-2.5 border-b border-ink/20"
+          >For Faculty</button>
+          {user ? (
+            <button
+              onClick={() => { logout(); setIsOpen(false); }}
+              className="flex items-center gap-2 fraunces text-[11px] tracking-[1.4px] uppercase text-ink py-2.5"
+            >
+              <LogOut className="w-3 h-3" /> Logout
+            </button>
+          ) : (
+            <Link
+              to="/simulator"
+              onClick={() => setIsOpen(false)}
+              className="block fraunces text-[11px] tracking-[1.4px] uppercase text-ink py-2.5"
+            >Enroll →</Link>
+          )}
+        </div>
+      )}
+    </div>
   );
 };
 

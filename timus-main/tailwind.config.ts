@@ -14,6 +14,17 @@ export default {
     },
     extend: {
       colors: {
+        // Editorial palette
+        paper: {
+          DEFAULT: '#f6f1e7',
+          dark: '#ece4d2',
+          deep: '#e4dac3',
+        },
+        ink: '#1a1613',
+        dim: '#6b5f4e',
+        ered: '#b8321e',
+        eteal: '#2f6b5d',
+        // Existing tokens
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

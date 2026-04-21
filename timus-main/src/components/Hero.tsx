@@ -1,109 +1,110 @@
-import { ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 
-const Hero = () => {
-  return (
-    <section className="min-h-screen flex items-center justify-center bg-background border-b border-border">
-      <div className="container mx-auto px-4 pt-20 pb-20">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-16 items-center">
+const TAPE = [
+  { name: "Apple Inc.",      sym: "AAPL", price: 189.42, change: "+1.24", vol: "42.8M" },
+  { name: "Microsoft Corp.", sym: "MSFT", price: 412.07, change: "+0.38", vol: "24.1M" },
+  { name: "NVIDIA Corp.",    sym: "NVDA", price: 872.15, change: "+2.61", vol: "41.6M" },
+  { name: "Tesla, Inc.",     sym: "TSLA", price: 178.33, change: "−0.92", vol: "88.2M" },
+  { name: "Meta Platforms",  sym: "META", price: 487.22, change: "+1.80", vol: "12.0M" },
+  { name: "Alphabet Inc.",   sym: "GOOG", price: 168.04, change: "−0.31", vol: "18.5M" },
+];
 
-            {/* Left: editorial copy */}
-            <div className="space-y-8">
-              <p className="text-xs font-bold tracking-[0.2em] text-muted-foreground uppercase">
-                Paper trading for finance courses
-              </p>
+const Hero = () => (
+  <section className="bg-paper px-8 md:px-14 pt-28 md:pt-[160px] pb-14">
 
-              <h1 className="garamond text-6xl md:text-7xl font-bold text-foreground leading-[1.05]">
-                Trade real stocks.<br />
-                <em className="font-normal text-muted-foreground">Risk nothing.</em>
-              </h1>
+    {/* Eyebrow */}
+    <p className="fraunces text-center text-[11px] tracking-[4px] uppercase text-ered font-semibold mb-5">
+      § Feature — Two Ways to Start
+    </p>
 
-              <p className="text-lg text-muted-foreground leading-relaxed max-w-md">
-                Live NYSE & NASDAQ prices. Market, limit, and stop orders.
-                A class leaderboard your professor can watch in real time.
-                Free for every student, forever.
-              </p>
+    {/* Main headline */}
+    <h1 className="fraunces font-[400] text-[56px] md:text-[92px] lg:text-[124px] leading-[0.92] tracking-[-2px] md:tracking-[-3.4px] text-center text-ink mx-auto max-w-[1160px]">
+      Learn to trade.<br />
+      <em className="text-ered">Alone,</em> or with your class.
+    </h1>
 
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button variant="default" size="lg" className="group" asChild>
-                  <Link to="/simulator">
-                    Open the simulator
-                    <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                  </Link>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  onClick={() => document.querySelector("#for-professors")?.scrollIntoView({ behavior: "smooth" })}
-                >
-                  For professors
-                </Button>
-              </div>
-            </div>
+    {/* Byline */}
+    <p className="fraunces text-center mt-7 text-[12px] tracking-[1.2px] text-dim uppercase">
+      By Sumit Punshi · Founder · Photography by the opening bell
+    </p>
 
-            {/* Right: simulator UI mockup */}
-            <div className="flex items-center justify-center">
-              <div className="w-full max-w-lg rounded-xl border-2 border-zinc-700 bg-zinc-950 shadow-2xl overflow-hidden text-left">
-                {/* Top bar */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold text-white">AAPL</span>
-                    <span className="text-zinc-400 text-xs">Apple Inc.</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-white font-bold">$189.42</span>
-                    <span className="text-green-400 text-xs ml-2">+1.24%</span>
-                  </div>
-                </div>
-                {/* Fake chart */}
-                <div className="px-4 pt-4 pb-2 bg-zinc-950">
-                  <svg viewBox="0 0 320 90" className="w-full h-24" preserveAspectRatio="none">
-                    <defs>
-                      <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#22c55e" stopOpacity="0.25" />
-                        <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                    <polyline
-                      points="0,72 32,68 64,58 96,62 128,44 160,50 192,32 224,38 256,22 288,16 320,10"
-                      fill="none"
-                      stroke="#22c55e"
-                      strokeWidth="2.5"
-                      strokeLinejoin="round"
-                    />
-                    <polygon
-                      points="0,72 32,68 64,58 96,62 128,44 160,50 192,32 224,38 256,22 288,16 320,10 320,90 0,90"
-                      fill="url(#chartFill)"
-                    />
-                  </svg>
-                </div>
-                {/* Order buttons */}
-                <div className="grid grid-cols-2 gap-3 px-4 pb-3">
-                  <div className="py-3 rounded-lg bg-green-600/20 border border-green-600/40 text-center text-green-400 text-sm font-bold">
-                    Buy
-                  </div>
-                  <div className="py-3 rounded-lg bg-rose-600/20 border border-rose-600/40 text-center text-rose-400 text-sm font-bold">
-                    Sell
-                  </div>
-                </div>
-                {/* Footer row */}
-                <div className="px-4 pb-4 flex items-center justify-between text-xs text-zinc-500">
-                  <span>Balance: <span className="text-white font-semibold">$100,000</span></span>
-                  <span className="text-yellow-400 font-semibold flex items-center gap-1">
-                    ⚡ Turbo
-                  </span>
-                  <span>0 positions</span>
-                </div>
-              </div>
-            </div>
+    {/* ── Two-column: drop-cap lede + The Tape ─────────────────────── */}
+    <div className="mt-16 md:mt-[72px] grid md:grid-cols-[1.2fr_1fr] gap-12 md:gap-16 max-w-[1280px] mx-auto items-start">
 
-          </div>
+      {/* Drop-cap lede */}
+      <div className="fraunces text-[17px] md:text-[20px] leading-[1.45] text-ink overflow-hidden">
+        <span style={{
+          float: "left",
+          fontFamily: '"Fraunces", Georgia, serif',
+          fontSize: 100,
+          lineHeight: 0.82,
+          fontWeight: 500,
+          marginRight: 14,
+          marginTop: 6,
+          color: "#1a1613",
+        }}>T</span>
+        hey start with a hundred thousand dollars of nothing,
+        and a ticker that updates every thirty seconds. By the end of
+        the month — or the end of the term — they know why the spread
+        matters, why a limit order beats a market order, and why
+        Tuesday is different from Thursday. <em>TiMUS</em> is the
+        trading simulator that works two ways: a quiet desk for the
+        self-taught, and a live room for the whole finance class.
+
+        <div className="mt-7 flex gap-3.5 items-center flex-wrap" style={{ clear: "left" }}>
+          <Link to="/simulator">
+            <button className="bg-ink text-paper fraunces px-7 py-4 text-[13px] tracking-[1.5px] uppercase cursor-pointer border-none">
+              Start learning solo →
+            </button>
+          </Link>
+          <button
+            onClick={() => document.getElementById("for-professors")?.scrollIntoView({ behavior: "smooth" })}
+            className="bg-transparent text-ink border-[1.5px] border-ink fraunces px-7 py-[15px] text-[13px] tracking-[1.5px] uppercase cursor-pointer"
+          >
+            Join a class room
+          </button>
         </div>
       </div>
-    </section>
-  );
-};
+
+      {/* The Tape */}
+      <div className="border-[1.5px] border-ink p-6 bg-paper-dark">
+        <div className="flex justify-between items-baseline border-b border-ink pb-2.5 mb-3.5">
+          <span className="fraunces text-[22px] font-bold italic text-ink">The Tape</span>
+          <span className="fraunces text-[11px] tracking-[1.5px] text-dim uppercase">Today · Closing</span>
+        </div>
+        <table className="w-full fraunces text-[13px] border-collapse" style={{ fontVariantNumeric: "tabular-nums" }}>
+          <thead>
+            <tr className="text-left fraunces text-[10px] tracking-[1.4px] text-dim uppercase">
+              <th className="py-1 font-medium">Stock</th>
+              <th className="py-1 font-medium text-right">Last</th>
+              <th className="py-1 font-medium text-right">Chg</th>
+              <th className="py-1 font-medium text-right">Vol</th>
+            </tr>
+          </thead>
+          <tbody>
+            {TAPE.map(({ name, sym, price, change, vol }) => (
+              <tr key={sym} className="border-t border-dotted border-dim/40">
+                <td className="py-1.5">
+                  {name} <span className="text-dim text-[11px]">· {sym}</span>
+                </td>
+                <td className="py-1.5 text-right">{price.toFixed(2)}</td>
+                <td className={`py-1.5 text-right ${change.startsWith("+") ? "text-eteal" : "text-ered"}`}>
+                  {change}
+                </td>
+                <td className="py-1.5 text-right text-dim">{vol}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="mt-3.5 pt-2.5 border-t-[1.5px] border-ink flex justify-between fraunces text-[11px] text-dim tracking-[0.8px]">
+          <span>S&amp;P 5,217 <span className="text-eteal">+0.44%</span></span>
+          <span>NASDAQ 16,402 <span className="text-eteal">+0.71%</span></span>
+          <span>DJIA 39,118 <span className="text-ered">−0.08%</span></span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+);
 
 export default Hero;
