@@ -80,7 +80,7 @@ const Portfolio = () => {
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [historyFilter, setHistoryFilter] = useState<"1h" | "6h" | "24h">("24h");
+  const [historyFilter, setHistoryFilter] = useState<"1h" | "6h" | "24h" | "all">("all");
 
   const fetchData = async () => {
     setLoading(true);
@@ -417,10 +417,10 @@ const Portfolio = () => {
 
           {/* ── Order History ─────────────────────────────────────────────── */}
           {(() => {
-            const filterMs = { "1h": 3600000, "6h": 21600000, "24h": 86400000 }[historyFilter];
+            const filterMs: Record<string, number> = { "1h": 3600000, "6h": 21600000, "24h": 86400000 };
             const now = Date.now();
             const filtered = orders
-              .filter((o) => now - new Date(o.timestamp).getTime() <= filterMs)
+              .filter((o) => historyFilter === "all" || now - new Date(o.timestamp).getTime() <= filterMs[historyFilter])
               .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
             return (
@@ -429,7 +429,7 @@ const Portfolio = () => {
                   <h2 className="text-lg font-bold text-foreground">Order History</h2>
                   {/* Time filter */}
                   <div className="flex items-center gap-1 bg-muted/50 rounded-xl p-1">
-                    {(["1h", "6h", "24h"] as const).map((f) => (
+                    {(["1h", "6h", "24h", "all"] as const).map((f) => (
                       <button
                         key={f}
                         onClick={() => setHistoryFilter(f)}
@@ -447,7 +447,7 @@ const Portfolio = () => {
                 <div className="p-4 space-y-2">
                   {filtered.length === 0 ? (
                     <p className="text-center text-muted-foreground py-8 text-sm">
-                      No orders in the last {historyFilter}
+                      {historyFilter === "all" ? "No orders yet" : `No orders in the last ${historyFilter}`}
                     </p>
                   ) : (
                     filtered.map((order) => (
@@ -478,7 +478,13 @@ const Portfolio = () => {
                             </span>
                           )}
                           <span className="text-xs text-muted-foreground">
-                            {new Date(order.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            {(() => {
+                              const d = new Date(order.timestamp);
+                              const isToday = d.toDateString() === new Date().toDateString();
+                              return isToday
+                                ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                                : d.toLocaleDateString([], { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+                            })()}
                           </span>
                         </div>
                         <span
