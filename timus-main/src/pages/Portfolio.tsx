@@ -175,7 +175,14 @@ const Portfolio = () => {
               localStorage.setItem("timus_balance", JSON.stringify(data.balance));
               localStorage.setItem("timus_initial_balance", JSON.stringify(data.initialBalance));
               localStorage.setItem("timus_positions", JSON.stringify(data.positions));
-              localStorage.setItem("timus_orders", JSON.stringify(data.orders));
+
+              // Merge orders: combine local + backend by ID so we never lose recent trades
+              const localOrders: Record<string, unknown>[] = JSON.parse(localStorage.getItem("timus_orders") || "[]");
+              const backendOrders: Record<string, unknown>[] = Array.isArray(data.orders) ? data.orders : [];
+              const byId = new Map<string, Record<string, unknown>>();
+              for (const o of backendOrders) byId.set(o.id as string, o);
+              for (const o of localOrders) byId.set(o.id as string, o); // local wins on conflict
+              localStorage.setItem("timus_orders", JSON.stringify([...byId.values()]));
             }
           }
         } catch {
