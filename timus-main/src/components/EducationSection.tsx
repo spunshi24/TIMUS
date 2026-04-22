@@ -29,7 +29,7 @@ function FirstTradeBody() {
       <P>There is a kind of paralysis unique to new traders, where the sheer quantity of buttons on a brokerage platform convinces you that placing a single order must be complicated. It isn't. The following seven steps cover ninety-five percent of what you will do in your first year.</P>
       <div>
         {steps.map(([n, t, d]) => (
-          <div key={n} className="grid grid-cols-[56px_1fr] gap-5 py-[18px] border-t border-ink/15">
+          <div key={n} className="grid grid-cols-[56px_1fr] gap-5 py-[18px] border-t border-border">
             <span className="fraunces text-[13px] tracking-[2px] text-ered font-bold pt-1">{n}</span>
             <div>
               <div className="fraunces text-[20px] md:text-[22px] font-medium tracking-[-0.4px] text-ink mb-1.5">{t}</div>
@@ -38,7 +38,7 @@ function FirstTradeBody() {
           </div>
         ))}
       </div>
-      <div className="mt-7 p-5 bg-paper border-[1.5px] border-dashed border-ink/40 fraunces">
+      <div className="mt-7 p-5 bg-muted/50 border border-dashed border-border fraunces">
         <p className="text-[11px] text-ered tracking-[2px] uppercase italic mb-1.5">Editor's note</p>
         <p className="text-[14px] md:text-[15px] leading-[1.6] text-ink">
           If your first trade loses money, you have done nothing wrong. If your first trade wins and you did not know why it would, you have done something dangerous — you have learned to be lucky.
@@ -65,7 +65,7 @@ function StrategiesBody() {
       <P>No style is objectively better. What matters is whether the style matches your temperament, your time, and the capital you can afford to risk. Here are the six most common approaches, in rough order of speed.</P>
       <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3.5">
         {strategies.map(([t, d, h]) => (
-          <div key={t} className="p-5 bg-paper border border-ink/20 fraunces">
+          <div key={t} className="p-5 bg-muted/30 border border-border fraunces">
             <div className="text-[19px] md:text-[20px] font-medium tracking-[-0.4px] text-ink mb-2">{t}</div>
             <div className="text-[13px] md:text-[14px] leading-[1.55] text-ink mb-3">{d}</div>
             <div className="text-[11px] tracking-[1.4px] text-ered uppercase italic">{h}</div>
@@ -107,7 +107,7 @@ function ConceptsBody() {
       <P>Master these four and you will understand ninety percent of what you read on the business page. The rest are refinements.</P>
       <div>
         {concepts.map((c) => (
-          <div key={c.t} className="py-[22px] border-t border-ink/20 fraunces">
+          <div key={c.t} className="py-[22px] border-t border-border/50 fraunces">
             <div className="text-[22px] md:text-[24px] font-medium tracking-[-0.5px] text-ink mb-2.5">{c.t}</div>
             <P>{c.p}</P>
             <ul className="pl-4 m-0 space-y-1">
@@ -183,17 +183,17 @@ const EducationSection = () => {
   const active = MODULES.find((m) => m.id === openId)!;
 
   return (
-    <section id="education" className="px-8 md:px-14 py-24 bg-paper border-t-[1.5px] border-ink">
+    <section id="education" className="py-24 bg-background border-t border-border">
 
       {/* Section header */}
-      <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-14 border-b-[1.5px] border-ink pb-5 gap-4">
+      <div className="container mx-auto px-4">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-14 border-b border-border pb-5 gap-4">
         <div>
-          <p className="fraunces text-[11px] text-ered tracking-[3px] uppercase italic mb-2.5">§ Education Hub</p>
-          <h2 className="fraunces text-[52px] md:text-[76px] tracking-[-2.2px] leading-[0.95] font-medium text-ink">
-            The Reading Room.
+          <h2 className="text-4xl md:text-5xl font-bold text-foreground">
+            Financial Education Hub
           </h2>
         </div>
-        <p className="fraunces text-[14px] text-dim md:max-w-[360px] md:text-right italic">
+        <p className="text-sm text-muted-foreground md:max-w-[360px] md:text-right">
           Four modules. Pick one, click to open. Everything you need to start trading with intention.
         </p>
       </div>
@@ -202,68 +202,57 @@ const EducationSection = () => {
       <div className="grid md:grid-cols-[340px_1fr] gap-10 items-start">
 
         {/* Module index */}
-        <div className="border-t border-ink/20">
+        <div className="border-t border-border">
           {MODULES.map((m) => {
             const isActive = openId === m.id;
             return (
               <button
                 key={m.id}
                 onClick={() => setOpenId(m.id)}
-                className={`block w-full text-left px-5 py-[22px] border-b border-ink/20 transition-colors fraunces ${
-                  isActive ? "bg-paper-deep" : "bg-transparent hover:bg-paper-dark"
+                className={`block w-full text-left px-5 py-[22px] border-b border-border transition-colors ${
+                  isActive ? "bg-muted" : "bg-transparent hover:bg-muted/50"
                 }`}
               >
-                <div className="flex justify-between items-baseline mb-1">
-                  <span className={`text-[11px] tracking-[2px] uppercase italic ${isActive ? "text-ered font-bold" : "text-dim"}`}>
-                    {m.kicker}
-                  </span>
-                  <span className="text-[10px] tracking-[1.4px] text-dim uppercase">{m.kind} · {m.read}</span>
-                </div>
-                <div className={`text-[22px] md:text-[24px] tracking-[-0.6px] leading-[1.1] text-ink mb-1 ${isActive ? "font-semibold italic" : "font-medium"}`}>
+                <div className={`text-lg font-semibold text-foreground mb-1 ${isActive ? "italic" : ""}`}>
                   {m.title}
-                  {isActive && <span className="text-ered ml-2 not-italic">&#8594;</span>}
+                  {isActive && <span className="ml-2">&#8594;</span>}
                 </div>
-                <div className="text-[13px] text-dim leading-[1.4]">{m.subtitle}</div>
+                <div className="text-sm text-muted-foreground leading-[1.4]">{m.subtitle}</div>
               </button>
             );
           })}
-          <p className="px-5 py-[18px] fraunces text-[12px] text-dim tracking-[1px] italic">
+          <p className="px-5 py-[18px] text-xs text-muted-foreground italic">
             More modules in preparation — post-mortems of famous trades, the psychology of drawdowns.
           </p>
         </div>
 
         {/* Expanded content panel */}
-        <div className="border-[1.5px] border-ink bg-paper-dark p-8 md:p-12 overflow-y-auto" style={{ maxHeight: 820 }}>
-          <div className="flex justify-between items-baseline border-b-[1.5px] border-ink pb-4 mb-[18px]">
-            <div>
-              <p className="fraunces text-[11px] text-ered tracking-[2px] uppercase italic mb-1">
-                {active.kicker} · {active.kind}
-              </p>
-              <h3 className="fraunces text-[32px] md:text-[40px] font-medium tracking-[-1.2px] leading-none text-ink">
-                {active.title}
-              </h3>
-            </div>
-            <span className="fraunces text-[11px] tracking-[1.4px] text-dim uppercase hidden md:block shrink-0 ml-4">
-              Reading time · {active.read}
+        <div className="border border-border bg-muted/30 rounded-lg p-8 md:p-12 overflow-y-auto" style={{ maxHeight: 820 }}>
+          <div className="flex justify-between items-baseline border-b border-border pb-4 mb-[18px]">
+            <h3 className="text-2xl md:text-3xl font-bold text-foreground">
+              {active.title}
+            </h3>
+            <span className="text-xs text-muted-foreground uppercase tracking-wider hidden md:block shrink-0 ml-4">
+              {active.read} read
             </span>
           </div>
 
           <active.Body />
 
-          <div className="mt-10 pt-5 border-t-[1.5px] border-ink flex justify-between items-center">
-            <span className="fraunces text-[12px] tracking-[1.4px] text-dim uppercase">End of {active.kicker}</span>
+          <div className="mt-10 pt-5 border-t border-border flex justify-end items-center">
             <button
               onClick={() => {
                 const idx = MODULES.findIndex((x) => x.id === openId);
                 setOpenId(MODULES[(idx + 1) % MODULES.length].id);
               }}
-              className="bg-ink text-paper fraunces px-5 py-3 text-[12px] tracking-[1.5px] uppercase cursor-pointer border-none"
+              className="px-5 py-2.5 bg-foreground text-background text-sm font-semibold rounded-md hover:opacity-90 transition-opacity cursor-pointer border-none"
             >
               Next module &#8594;
             </button>
           </div>
         </div>
 
+      </div>
       </div>
     </section>
   );

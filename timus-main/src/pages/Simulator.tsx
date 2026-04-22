@@ -681,7 +681,7 @@ const Simulator = () => {
           <div className="bg-zinc-900 border-b border-yellow-500/40 px-4 py-3 text-center">
             <span className="text-yellow-400 font-semibold text-sm">
               👋 Professor preview — try a few live trades below. When you're ready to run this with your class, hit the{" "}
-              <strong>DEMO?</strong> button below the trading panel.
+              <strong>Book a demo</strong> button below the trading panel.
             </span>
           </div>
         )}
@@ -738,7 +738,7 @@ const Simulator = () => {
                 onClick={() => setDemoCardOpen(true)}
                 className="px-8 py-3 bg-black border border-zinc-700 hover:bg-zinc-900 text-white font-bold rounded-xl tracking-wide transition-colors"
               >
-                DEMO?
+                Book a demo
               </button>
             </div>
           )}

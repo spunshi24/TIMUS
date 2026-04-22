@@ -43,7 +43,7 @@ const ContactSection = () => {
             </Button>
 
             <Button variant="outline" className="gap-2 h-11 px-6 text-base" asChild>
-              <a href="https://github.com" target="_blank" rel="noopener noreferrer">
+              <a href="https://github.com/spunshi24" target="_blank" rel="noopener noreferrer">
                 <Github className="w-4 h-4" />
                 GitHub
               </a>
@@ -111,7 +111,7 @@ const ContactSection = () => {
                 title="Copy email"
               >
                 {copied ? (
-                  <Check className="w-4 h-4 text-success" />
+                  <Check className="w-4 h-4 text-green-500" />
                 ) : (
                   <Copy className="w-4 h-4" />
                 )}
