@@ -13,6 +13,7 @@ import json
 from flask_jwt_extended import (
     JWTManager, create_access_token,
     jwt_required, get_jwt_identity,
+    verify_jwt_in_request,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -974,6 +975,189 @@ def join_game_room():
         conn.close()
         return jsonify({"ok": True, "code": room["code"]})
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ─── Game Room leaderboard & details ─────────────────────────────────────────
+
+@app.route("/api/gameroom/<code>/leaderboard", methods=["GET"])
+def gameroom_leaderboard(code):
+    """
+    Public leaderboard for a game room. No JWT required so it can be projected.
+    If a valid JWT is provided, the response includes `requesting_user_id` so the
+    frontend can highlight the current user's row.
+    """
+    if not DATABASE_URL:
+        return jsonify({"error": "Database not configured"}), 503
+
+    # Optionally identify the requesting user (no error if missing)
+    requesting_user_id = None
+    try:
+        verify_jwt_in_request(optional=True)
+        identity = get_jwt_identity()
+        if identity:
+            requesting_user_id = int(identity)
+    except Exception:
+        pass
+
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # Verify room exists
+        cur.execute("SELECT id FROM game_rooms WHERE code = %s", (code.upper(),))
+        room = cur.fetchone()
+        if not room:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Game room not found"}), 404
+
+        # Get all members with their portfolios
+        cur.execute("""
+            SELECT u.id AS user_id, u.username,
+                   p.balance, p.initial_balance, p.positions
+            FROM game_room_members grm
+            JOIN users u ON u.id = grm.user_id
+            LEFT JOIN portfolios p ON p.user_id = u.id
+            WHERE grm.game_room_id = %s
+        """, (room["id"],))
+        members = cur.fetchall()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        logger.error("leaderboard %s: %s", code, e)
+        return jsonify({"error": str(e)}), 500
+
+    # Build leaderboard entries
+    entries = []
+    # Collect all unique tickers held by any member
+    all_tickers = set()
+    member_data = []
+    for m in members:
+        positions = m["positions"] or []
+        if isinstance(positions, str):
+            positions = json.loads(positions)
+        tickers = {p["ticker"] for p in positions if isinstance(p, dict) and "ticker" in p}
+        all_tickers.update(tickers)
+        member_data.append({
+            "user_id": m["user_id"],
+            "username": m["username"],
+            "balance": float(m["balance"] or 100000),
+            "initial_balance": float(m["initial_balance"] or 100000),
+            "positions": positions,
+        })
+
+    # Fetch current prices for all tickers from cache (30s TTL)
+    prices = {}
+    for ticker in all_tickers:
+        cached = cache_get(f"quote:{ticker}")
+        if cached and cached.get("price"):
+            prices[ticker] = float(cached["price"])
+        else:
+            # Try a quick yfinance fetch if not cached
+            try:
+                stock = yf.Ticker(ticker)
+                info = stock.info or {}
+                price = (
+                    info.get("currentPrice")
+                    or info.get("regularMarketPrice")
+                    or info.get("ask")
+                )
+                if price:
+                    prices[ticker] = float(price)
+                    cache_set(f"quote:{ticker}", {"ticker": ticker, "price": float(price)}, QUOTE_CACHE_DURATION)
+            except Exception:
+                pass
+
+    # Calculate equity and return for each member
+    for md in member_data:
+        position_value = 0.0
+        for pos in md["positions"]:
+            if not isinstance(pos, dict):
+                continue
+            ticker = pos.get("ticker", "")
+            qty = float(pos.get("quantity", 0))
+            current_price = prices.get(ticker, float(pos.get("entryPrice", 0)))
+            position_value += qty * current_price
+
+        equity = md["balance"] + position_value
+        initial = md["initial_balance"]
+        return_pct = ((equity - initial) / initial * 100) if initial > 0 else 0.0
+
+        entries.append({
+            "user_id": md["user_id"],
+            "username": md["username"],
+            "equity": round(equity, 2),
+            "return_pct": round(return_pct, 2),
+            "direction": "up" if return_pct >= 0 else "down",
+        })
+
+    # Sort by return_pct descending
+    entries.sort(key=lambda e: e["return_pct"], reverse=True)
+
+    # Assign ranks
+    for i, entry in enumerate(entries):
+        entry["rank"] = i + 1
+
+    return jsonify({
+        "leaderboard": entries,
+        "requesting_user_id": requesting_user_id,
+    })
+
+
+@app.route("/api/gameroom/<code>/details", methods=["GET"])
+@jwt_required()
+def gameroom_details(code):
+    """Room details — JWT required. Returns 404 if room doesn't exist, 403 if not a member."""
+    if not DATABASE_URL:
+        return jsonify({"error": "Database not configured"}), 503
+    user_id = int(get_jwt_identity())
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        cur.execute("""
+            SELECT gr.id, gr.code, gr.created_at, u.username AS creator_username
+            FROM game_rooms gr
+            LEFT JOIN users u ON u.id = gr.creator_id
+            WHERE gr.code = %s
+        """, (code.upper(),))
+        room = cur.fetchone()
+        if not room:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Game room not found"}), 404
+
+        # Check membership
+        cur.execute(
+            "SELECT 1 FROM game_room_members WHERE game_room_id = %s AND user_id = %s",
+            (room["id"], user_id)
+        )
+        if not cur.fetchone():
+            cur.close()
+            conn.close()
+            return jsonify({"error": "You are not a member of this room"}), 403
+
+        # Get all members
+        cur.execute("""
+            SELECT u.username FROM game_room_members grm
+            JOIN users u ON u.id = grm.user_id
+            WHERE grm.game_room_id = %s
+            ORDER BY grm.joined_at ASC
+        """, (room["id"],))
+        member_rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        return jsonify({
+            "code": room["code"],
+            "creator": room["creator_username"],
+            "member_count": len(member_rows),
+            "created_at": room["created_at"].isoformat() if room["created_at"] else None,
+            "members": [r["username"] for r in member_rows],
+        })
+    except Exception as e:
+        logger.error("gameroom_details %s: %s", code, e)
         return jsonify({"error": str(e)}), 500
 
 

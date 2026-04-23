@@ -233,8 +233,9 @@ const Simulator = () => {
   const [blockedMsg, setBlockedMsg] = useState<string | null>(null);
   const [demoCardOpen, setDemoCardOpen] = useState(false);
 
-  // Detect professor demo flow (?ref=professor in URL)
-  const isProfDemo = new URLSearchParams(window.location.search).get("ref") === "professor";
+  // Detect educator/professor demo flow (?ref=professor or ?ref=educator in URL)
+  const refParam = new URLSearchParams(window.location.search).get("ref");
+  const isProfDemo = refParam === "professor" || refParam === "educator";
 
   // Refs — avoid stale closures inside callbacks
   const balanceRef = useRef(balance);
@@ -688,8 +689,8 @@ const Simulator = () => {
         {isProfDemo && (
           <div className="bg-zinc-900 border-b border-yellow-500/40 px-4 py-3 text-center">
             <span className="text-yellow-400 font-semibold text-sm">
-              👋 Professor preview — try a few live trades below. When you're ready to run this with your class, hit the{" "}
-              <strong>Book a demo</strong> button below the trading panel.
+              👋 Educator preview — try a few live trades below. Ready to use TiMUS with your class? Hit the{" "}
+              <strong>Book a demo</strong> button below.
             </span>
           </div>
         )}
