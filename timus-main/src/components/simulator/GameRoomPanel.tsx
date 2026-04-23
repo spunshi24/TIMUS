@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Copy, Check, ExternalLink } from "lucide-react";
 import { API_BASE } from "@/lib/api";
 import type { AuthUser } from "@/context/AuthContext";
@@ -52,7 +52,7 @@ function LeaderboardTable({
         </tr>
       </thead>
       <tbody>
-        {entries.map((e) => {
+        {(entries ?? []).map((e) => {
           const isYou = requestingUserId !== null && e.user_id === requestingUserId;
           return (
             <tr
@@ -137,29 +137,38 @@ const GameRoomPanel = ({ user, token, onAuthClick }: GameRoomPanelProps) => {
     }
   }, [activeRoom]);
 
-  // ── Fetch leaderboard ─────────────────────────────────────────────────
-  const fetchLeaderboard = useCallback(async (code: string) => {
-    try {
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE}/api/gameroom/${code}/leaderboard`, { headers });
-      if (!res.ok) return;
-      const data = await res.json();
-      setLeaderboard(data.leaderboard || []);
-      setRequestingUserId(data.requesting_user_id ?? null);
-    } catch {
-      // silently fail
-    }
-  }, [token]);
+  // Stable ref for token so the polling effect doesn't restart on token change
+  const tokenRef = useRef(token);
+  useEffect(() => { tokenRef.current = token; }, [token]);
 
-  // Initial fetch + polling every 30s
+  // ── Fetch leaderboard with AbortController ──────────────────────────
   useEffect(() => {
     if (!activeRoom) return;
+    const controller = new AbortController();
+
+    const doFetch = async () => {
+      try {
+        const headers: Record<string, string> = {};
+        if (tokenRef.current) headers["Authorization"] = `Bearer ${tokenRef.current}`;
+        const res = await fetch(
+          `${API_BASE}/api/gameroom/${activeRoom}/leaderboard`,
+          { headers, signal: controller.signal },
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        setLeaderboard(Array.isArray(data.leaderboard) ? data.leaderboard : []);
+        setRequestingUserId(data.requesting_user_id ?? null);
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        console.error("Leaderboard fetch error:", err);
+      }
+    };
+
     setLbLoading(true);
-    fetchLeaderboard(activeRoom).finally(() => setLbLoading(false));
-    const interval = setInterval(() => fetchLeaderboard(activeRoom), 30000);
-    return () => clearInterval(interval);
-  }, [activeRoom, fetchLeaderboard]);
+    doFetch().finally(() => setLbLoading(false));
+    const interval = setInterval(doFetch, 30000);
+    return () => { controller.abort(); clearInterval(interval); };
+  }, [activeRoom]);
 
   // ── Handlers ──────────────────────────────────────────────────────────
   const handleOpenCreate = () => {

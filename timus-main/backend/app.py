@@ -1026,78 +1026,97 @@ def gameroom_leaderboard(code):
         conn.close()
     except Exception as e:
         logger.error("leaderboard %s: %s", code, e)
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"leaderboard": [], "requesting_user_id": requesting_user_id, "error": str(e)}), 200
 
-    # Build leaderboard entries
-    entries = []
-    # Collect all unique tickers held by any member
-    all_tickers = set()
-    member_data = []
-    for m in members:
-        positions = m["positions"] or []
-        if isinstance(positions, str):
-            positions = json.loads(positions)
-        tickers = {p["ticker"] for p in positions if isinstance(p, dict) and "ticker" in p}
-        all_tickers.update(tickers)
-        member_data.append({
-            "user_id": m["user_id"],
-            "username": m["username"],
-            "balance": float(m["balance"] or 100000),
-            "initial_balance": float(m["initial_balance"] or 100000),
-            "positions": positions,
-        })
-
-    # Fetch current prices for all tickers from cache (30s TTL)
-    prices = {}
-    for ticker in all_tickers:
-        cached = cache_get(f"quote:{ticker}")
-        if cached and cached.get("price"):
-            prices[ticker] = float(cached["price"])
-        else:
-            # Try a quick yfinance fetch if not cached
+    # Build leaderboard entries — wrapped so price-fetch crashes can't kill the endpoint
+    try:
+        entries = []
+        # Collect all unique tickers held by any member
+        all_tickers = set()
+        member_data = []
+        for m in members:
+            positions = m.get("positions") or []
+            if isinstance(positions, str):
+                try:
+                    positions = json.loads(positions)
+                except Exception:
+                    positions = []
+            if not isinstance(positions, list):
+                positions = []
+            tickers = {p["ticker"] for p in positions if isinstance(p, dict) and "ticker" in p}
+            all_tickers.update(tickers)
+            balance = 100000.0
+            initial_balance = 100000.0
             try:
-                stock = yf.Ticker(ticker)
-                info = stock.info or {}
-                price = (
-                    info.get("currentPrice")
-                    or info.get("regularMarketPrice")
-                    or info.get("ask")
-                )
-                if price:
-                    prices[ticker] = float(price)
-                    cache_set(f"quote:{ticker}", {"ticker": ticker, "price": float(price)}, QUOTE_CACHE_DURATION)
-            except Exception:
+                balance = float(m["balance"]) if m.get("balance") is not None else 100000.0
+            except (TypeError, ValueError):
                 pass
+            try:
+                initial_balance = float(m["initial_balance"]) if m.get("initial_balance") is not None else 100000.0
+            except (TypeError, ValueError):
+                pass
+            member_data.append({
+                "user_id": m["user_id"],
+                "username": m.get("username", "Unknown"),
+                "balance": balance,
+                "initial_balance": initial_balance,
+                "positions": positions,
+            })
 
-    # Calculate equity and return for each member
-    for md in member_data:
-        position_value = 0.0
-        for pos in md["positions"]:
-            if not isinstance(pos, dict):
-                continue
-            ticker = pos.get("ticker", "")
-            qty = float(pos.get("quantity", 0))
-            current_price = prices.get(ticker, float(pos.get("entryPrice", 0)))
-            position_value += qty * current_price
+        # Fetch current prices for all tickers from cache (30s TTL)
+        prices = {}
+        for ticker in all_tickers:
+            cached = cache_get(f"quote:{ticker}")
+            if cached and cached.get("price"):
+                prices[ticker] = float(cached["price"])
+            else:
+                # Try a quick yfinance fetch if not cached
+                try:
+                    stock = yf.Ticker(ticker)
+                    info = stock.info or {}
+                    price = (
+                        info.get("currentPrice")
+                        or info.get("regularMarketPrice")
+                        or info.get("ask")
+                    )
+                    if price:
+                        prices[ticker] = float(price)
+                        cache_set(f"quote:{ticker}", {"ticker": ticker, "price": float(price)}, QUOTE_CACHE_DURATION)
+                except Exception:
+                    pass
 
-        equity = md["balance"] + position_value
-        initial = md["initial_balance"]
-        return_pct = ((equity - initial) / initial * 100) if initial > 0 else 0.0
+        # Calculate equity and return for each member
+        for md in member_data:
+            position_value = 0.0
+            for pos in md["positions"]:
+                if not isinstance(pos, dict):
+                    continue
+                ticker = pos.get("ticker", "")
+                qty = float(pos.get("quantity", 0))
+                current_price = prices.get(ticker, float(pos.get("entryPrice", 0)))
+                position_value += qty * current_price
 
-        entries.append({
-            "user_id": md["user_id"],
-            "username": md["username"],
-            "equity": round(equity, 2),
-            "return_pct": round(return_pct, 2),
-            "direction": "up" if return_pct >= 0 else "down",
-        })
+            equity = md["balance"] + position_value
+            initial = md["initial_balance"]
+            return_pct = ((equity - initial) / initial * 100) if initial > 0 else 0.0
 
-    # Sort by return_pct descending
-    entries.sort(key=lambda e: e["return_pct"], reverse=True)
+            entries.append({
+                "user_id": md["user_id"],
+                "username": md["username"],
+                "equity": round(equity, 2),
+                "return_pct": round(return_pct, 2),
+                "direction": "up" if return_pct >= 0 else "down",
+            })
 
-    # Assign ranks
-    for i, entry in enumerate(entries):
-        entry["rank"] = i + 1
+        # Sort by return_pct descending
+        entries.sort(key=lambda e: e["return_pct"], reverse=True)
+
+        # Assign ranks
+        for i, entry in enumerate(entries):
+            entry["rank"] = i + 1
+    except Exception as e:
+        logger.error("leaderboard calc %s: %s", code, e)
+        entries = []
 
     return jsonify({
         "leaderboard": entries,

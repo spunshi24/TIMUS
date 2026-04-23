@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { API_BASE } from "@/lib/api";
 
@@ -17,38 +17,36 @@ const Leaderboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchLeaderboard = useCallback(async () => {
-    if (!code) return;
-    try {
-      const res = await fetch(`${API_BASE}/api/gameroom/${code}/leaderboard`);
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error || "Room not found");
-        return;
-      }
-      const data = await res.json();
-      setEntries(data.leaderboard || []);
-      setError(null);
-    } catch {
-      setError("Failed to connect to server");
-    } finally {
-      setLoading(false);
-    }
-  }, [code]);
-
   useEffect(() => {
-    fetchLeaderboard();
-    const interval = setInterval(fetchLeaderboard, 15000);
-    return () => clearInterval(interval);
-  }, [fetchLeaderboard]);
+    if (!code) return;
+    const controller = new AbortController();
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <p className="text-zinc-500 text-xl">{error}</p>
-      </div>
-    );
-  }
+    const doFetch = async () => {
+      try {
+        const res = await fetch(
+          `${API_BASE}/api/gameroom/${code}/leaderboard`,
+          { signal: controller.signal },
+        );
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setError(data.error || "Room not found");
+          return;
+        }
+        const data = await res.json();
+        setEntries(Array.isArray(data.leaderboard) ? data.leaderboard : []);
+        setError(null); // clear transient errors on success
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setError("Failed to connect to server");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    doFetch();
+    const interval = setInterval(doFetch, 15000);
+    return () => { controller.abort(); clearInterval(interval); };
+  }, [code]);
 
   return (
     <div className="min-h-screen bg-zinc-950 p-8 flex flex-col">
@@ -71,6 +69,13 @@ const Leaderboard = () => {
           LIVE — refreshes every 15s
         </span>
       </div>
+
+      {/* Error banner (non-blocking — shows above the table, not instead of it) */}
+      {error && (
+        <div className="mb-4 px-4 py-2 rounded-lg bg-red-900/30 border border-red-800 text-red-400 text-sm">
+          {error}
+        </div>
+      )}
 
       {/* Table */}
       <div className="flex-1 rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden">
@@ -96,7 +101,7 @@ const Leaderboard = () => {
               </tr>
             </thead>
             <tbody>
-              {entries.map((e) => (
+              {(entries ?? []).map((e) => (
                 <tr
                   key={e.user_id}
                   className="border-t border-zinc-800/50 hover:bg-zinc-800/30 transition-colors"
