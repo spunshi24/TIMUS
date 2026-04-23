@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#FFFFFF"/>
+  <rect x="80" y="280" width="120" height="4" rx="2" fill="hsl(142, 76%, 36%)"/>
+  <text x="80" y="260" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="#1a1a1a">TiMUS</text>
+  <text x="80" y="330" font-family="system-ui, -apple-system, sans-serif" font-size="36" font-weight="400" fill="#6b7280">Simpler way to Paper Trade</text>
+  <text x="80" y="380" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="400" fill="#9ca3af">Free forever for students</text>
+</svg>
