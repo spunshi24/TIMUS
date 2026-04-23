@@ -190,7 +190,7 @@ const EducationSection = () => {
       <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-14 border-b border-border pb-5 gap-4">
         <div>
           <h2 className="text-4xl md:text-5xl font-bold text-foreground">
-            Financial Education Hub
+            Learn before you trade.
           </h2>
         </div>
         <p className="text-sm text-muted-foreground md:max-w-[360px] md:text-right">

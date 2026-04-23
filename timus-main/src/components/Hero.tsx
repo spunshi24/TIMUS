@@ -14,26 +14,26 @@ const Hero = () => {
             {/* Left: copy + CTAs */}
             <div className="space-y-8 animate-fadeIn text-center md:text-left">
               <h1 className="text-5xl md:text-6xl font-semibold text-foreground leading-tight tracking-tight">
-                The trading simulator built for your finance class.
+                The simpler way to paper trade.
               </h1>
 
               <p className="text-xl text-muted-foreground font-light leading-relaxed">
-                Real market data. Market, limit, and stop orders. Free forever for students.
+                Real market data. Real order types. Free for everyone.
               </p>
 
               <div className="flex flex-col sm:flex-row items-center md:items-start justify-center md:justify-start gap-4">
                 <Button variant="default" size="lg" className="group" asChild>
                   <Link to="/simulator">
-                    Try the simulator
+                    Start trading
                     <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </Link>
                 </Button>
                 <Button
                   variant="outline"
                   size="lg"
-                  onClick={() => document.querySelector("#for-professors")?.scrollIntoView({ behavior: "smooth" })}
+                  onClick={() => document.querySelector("#for-educators")?.scrollIntoView({ behavior: "smooth" })}
                 >
-                  For professors
+                  For educators
                 </Button>
               </div>
             </div>

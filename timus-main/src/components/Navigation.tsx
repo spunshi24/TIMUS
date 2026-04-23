@@ -33,10 +33,10 @@ const Navigation = () => {
             Simulator
           </Link>
           <button
-            onClick={() => scrollTo("for-professors")}
+            onClick={() => scrollTo("for-educators")}
             className="hover:text-foreground transition-colors"
           >
-            For Professors
+            For Educators
           </button>
           <Link to="/portfolio" className="hover:text-foreground transition-colors">
             Portfolio
@@ -85,10 +85,10 @@ const Navigation = () => {
             Simulator
           </Link>
           <button
-            onClick={() => scrollTo("for-professors")}
+            onClick={() => scrollTo("for-educators")}
             className="block w-full text-left text-sm font-medium text-foreground py-2.5 border-b border-border/50"
           >
-            For Professors
+            For Educators
           </button>
           <Link
             to="/portfolio"

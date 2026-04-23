@@ -17,9 +17,9 @@ const steps = [
   {
     icon: Trophy,
     step: "03",
-    title: "Your whole class trades in the same room.",
+    title: "Compete with friends or your class.",
     description:
-      "Everyone sees the leaderboard. Your professor sees every position and every trade.",
+      "Create a Game Room, share the code, and race to the top of the leaderboard — whether it's a class assignment or a bet with friends.",
   },
 ];
 
