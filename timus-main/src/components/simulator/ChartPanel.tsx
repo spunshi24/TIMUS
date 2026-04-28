@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { TrendingUp, TrendingDown, AlertCircle, Loader2, RefreshCw } from "lucide-react";
 import { API_BASE } from "@/lib/api";
 
@@ -68,15 +68,79 @@ const ChartPanel = ({ ticker, onPriceUpdate }: ChartPanelProps) => {
   const [period, setPeriod] = useState<Period>("1D");
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
+  // Stable refs to avoid recreating callbacks / restarting effects
   const periodRef = useRef<Period>("1D");
+  const onPriceUpdateRef = useRef(onPriceUpdate);
+  const abortRef = useRef<AbortController | null>(null);
 
+  useEffect(() => { periodRef.current = period; }, [period]);
+  useEffect(() => { onPriceUpdateRef.current = onPriceUpdate; }, [onPriceUpdate]);
+
+  // ── Full fetch (ticker change or 30s poll) ──────────────────────────────────
   useEffect(() => {
-    periodRef.current = period;
-  }, [period]);
+    if (!ticker || ticker.trim().length === 0) {
+      setLoading(false);
+      return;
+    }
 
-  // ── Fetch history only (period changes) ─────────────────────────────────────
-  const fetchHistory = useCallback(async (p: Period) => {
+    // Abort any in-flight request from a prior ticker / poll cycle
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    let firstLoad = true;
+
+    const doFetch = async () => {
+      const showLoader = firstLoad;
+      firstLoad = false;
+      if (showLoader) setLoading(true);
+      setError(null);
+      setHoverIndex(null);
+
+      try {
+        const [quoteRes, histRes] = await Promise.all([
+          fetch(`${API_BASE}/api/quote/${ticker}`, { signal: controller.signal }),
+          fetch(`${API_BASE}/api/history/${ticker}?${PERIOD_PARAMS[periodRef.current]}`, { signal: controller.signal }),
+        ]);
+
+        if (!quoteRes.ok) {
+          const body = await quoteRes.json().catch(() => ({}));
+          throw new Error(body.error || `Ticker "${ticker}" not found.`);
+        }
+
+        const quoteData: QuoteData = await quoteRes.json();
+        setQuote(quoteData);
+        onPriceUpdateRef.current?.(quoteData.price);
+        setLastUpdated(new Date());
+
+        if (histRes.ok) {
+          const histData = await histRes.json();
+          setHistory(histData.data ?? []);
+        }
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setError(err instanceof Error ? err.message : "Failed to load data.");
+        setQuote(null);
+        setHistory([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Reset period on ticker change
+    setPeriod("1D");
+    periodRef.current = "1D";
+
+    doFetch();
+    const interval = setInterval(doFetch, 30_000);
+    return () => { controller.abort(); clearInterval(interval); };
+  }, [ticker]);
+
+  // ── Fetch history only (period button click) ─────────────────────────────────
+  const handlePeriodChange = async (p: Period) => {
     if (!ticker) return;
+    setPeriod(p);
+    periodRef.current = p;
     setHistoryLoading(true);
     setHoverIndex(null);
     try {
@@ -90,62 +154,21 @@ const ChartPanel = ({ ticker, onPriceUpdate }: ChartPanelProps) => {
     } finally {
       setHistoryLoading(false);
     }
-  }, [ticker]);
+  };
 
-  // ── Full fetch (ticker changes or 30s poll) ──────────────────────────────────
-  const fetchAll = useCallback(async (showLoader = true) => {
-    if (!ticker || ticker.trim().length === 0) return;
-
-    if (showLoader) setLoading(true);
-    setError(null);
-    setHoverIndex(null);
-
+  // Manual refresh
+  const handleRefresh = async () => {
+    if (!ticker) return;
     try {
-      const [quoteRes, histRes] = await Promise.all([
-        fetch(`${API_BASE}/api/quote/${ticker}`),
-        fetch(`${API_BASE}/api/history/${ticker}?${PERIOD_PARAMS[periodRef.current]}`),
-      ]);
-
-      if (!quoteRes.ok) {
-        const body = await quoteRes.json().catch(() => ({}));
-        throw new Error(body.error || `Ticker "${ticker}" not found.`);
-      }
-
-      const quoteData: QuoteData = await quoteRes.json();
+      const res = await fetch(`${API_BASE}/api/quote/${ticker}`);
+      if (!res.ok) return;
+      const quoteData: QuoteData = await res.json();
       setQuote(quoteData);
-      onPriceUpdate?.(quoteData.price);
+      onPriceUpdateRef.current?.(quoteData.price);
       setLastUpdated(new Date());
-
-      if (histRes.ok) {
-        const histData = await histRes.json();
-        setHistory(histData.data ?? []);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load data.");
-      setQuote(null);
-      setHistory([]);
-    } finally {
-      setLoading(false);
+    } catch {
+      // silently ignore
     }
-  }, [ticker, onPriceUpdate]);
-
-  // On ticker change: full reload, reset period to 1D
-  useEffect(() => {
-    setPeriod("1D");
-    periodRef.current = "1D";
-    fetchAll(true);
-  }, [fetchAll]);
-
-  // 30s quote polling
-  useEffect(() => {
-    const id = setInterval(() => fetchAll(false), 30_000);
-    return () => clearInterval(id);
-  }, [fetchAll]);
-
-  // Period button handler
-  const handlePeriodChange = (p: Period) => {
-    setPeriod(p);
-    fetchHistory(p);
   };
 
   // ── Chart math ───────────────────────────────────────────────────────────────
@@ -168,7 +191,7 @@ const ChartPanel = ({ ticker, onPriceUpdate }: ChartPanelProps) => {
   const isPositive = (quote?.change ?? 0) >= 0;
   const lineColor = isPositive ? "hsl(142, 76%, 36%)" : "hsl(0, 84%, 60%)";
 
-  // ── Mouse hover on chart ─────────────────────────────────────────────────────
+  // ── Mouse hover on chart ───────────────────────────────────────────────────
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
     if (prices.length < 2) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -179,7 +202,7 @@ const ChartPanel = ({ ticker, onPriceUpdate }: ChartPanelProps) => {
 
   const handleMouseLeave = () => setHoverIndex(null);
 
-  // ── Loading ──────────────────────────────────────────────────────────────────
+  // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div
@@ -194,7 +217,7 @@ const ChartPanel = ({ ticker, onPriceUpdate }: ChartPanelProps) => {
     );
   }
 
-  // ── Error ────────────────────────────────────────────────────────────────────
+  // ── Error ──────────────────────────────────────────────────────────────────
   if (error) {
     return (
       <div
@@ -264,7 +287,7 @@ const ChartPanel = ({ ticker, onPriceUpdate }: ChartPanelProps) => {
             </span>
           )}
           <button
-            onClick={() => fetchAll(false)}
+            onClick={handleRefresh}
             className="p-2 rounded hover:bg-muted transition-colors"
             title="Refresh quote"
           >

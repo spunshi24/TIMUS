@@ -24,32 +24,35 @@ const WatchlistPanel = ({ selectedTicker, onSelectTicker }: WatchlistPanelProps)
   const [items, setItems] = useState<WatchItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchPrices = async () => {
-    const results = await Promise.allSettled(
-      WATCHLIST.map((t) =>
-        fetch(`${API_BASE}/api/quote/${t}`).then((r) => r.json())
-      )
-    );
-    const loaded: WatchItem[] = results
-      .filter((r): r is PromiseFulfilledResult<Record<string, unknown>> => r.status === "fulfilled")
-      .map((r) => r.value)
-      .filter((d) => typeof d.price === "number")
-      .map((d) => ({
-        ticker: d.ticker as string,
-        name: d.name as string,
-        price: d.price as number,
-        change: d.change as number,
-        change_pct: d.change_pct as number,
-      }));
-    setItems(loaded);
-    setLoading(false);
-  };
-
   useEffect(() => {
+    const controller = new AbortController();
+
+    const fetchPrices = async () => {
+      const results = await Promise.allSettled(
+        WATCHLIST.map((t) =>
+          fetch(`${API_BASE}/api/quote/${t}`, { signal: controller.signal }).then((r) => r.json())
+        )
+      );
+      if (controller.signal.aborted) return;
+      const loaded: WatchItem[] = results
+        .filter((r): r is PromiseFulfilledResult<Record<string, unknown>> => r.status === "fulfilled")
+        .map((r) => r.value)
+        .filter((d) => typeof d.price === "number")
+        .map((d) => ({
+          ticker: d.ticker as string,
+          name: d.name as string,
+          price: d.price as number,
+          change: d.change as number,
+          change_pct: d.change_pct as number,
+        }));
+      setItems(loaded);
+      setLoading(false);
+    };
+
     fetchPrices();
     const id = setInterval(fetchPrices, 30_000);
-    return () => clearInterval(id);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { controller.abort(); clearInterval(id); };
+  }, []);
 
   return (
     <div className="p-6 rounded-lg border-2 border-border bg-card shadow-lg">
