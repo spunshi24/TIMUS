@@ -205,7 +205,7 @@ const Portfolio = () => {
     n.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
   const pnlColor = (n: number) => (n >= 0 ? "text-success" : "text-destructive");
-  const pnlSign = (n: number) => (n >= 0 ? "+" : "");
+  const pnlSign = (n: number) => (n >= 0 ? "+" : "-");
 
   return (
     <div className="min-h-screen bg-background">
@@ -251,7 +251,7 @@ const Portfolio = () => {
               {
                 label: "Total P&L",
                 value: `${pnlSign(totalPnL)}$${fmt(Math.abs(totalPnL))}`,
-                sub: `${pnlSign(totalPnLPct)}${fmt(totalPnLPct)}%`,
+                sub: `${pnlSign(totalPnLPct)}${fmt(Math.abs(totalPnLPct))}%`,
                 color: pnlColor(totalPnL),
               },
               {

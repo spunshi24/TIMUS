@@ -574,7 +574,9 @@ const Simulator = () => {
       timestamp: new Date(),
     };
 
-    setOrders((prev) => [...prev, newOrder]);
+    // Update both state and ref so fillOrder sees the new order immediately
+    ordersRef.current = [...ordersRef.current, newOrder];
+    setOrders([...ordersRef.current]);
 
     // ── Market order ─────────────────────────────────────────────────────
     if (order.type === "market") {
@@ -656,7 +658,9 @@ const Simulator = () => {
       status: "pending",
       timestamp: new Date(),
     };
-    setOrders((prev) => [...prev, newOrder]);
+    // Update both state and ref so fillOrder sees the new order immediately
+    ordersRef.current = [...ordersRef.current, newOrder];
+    setOrders([...ordersRef.current]);
     fillOrder(newOrder, execPrice);
   };
 
