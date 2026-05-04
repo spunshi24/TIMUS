@@ -272,6 +272,7 @@ const Simulator = () => {
       setInitialBalance(100000);
       setPositions([]);
       setOrders([]);
+      localStorage.setItem("timus_realized_pnl", "0");
       selectedTickerRef.current = "";
       setSelectedTicker("");
     }
@@ -306,6 +307,8 @@ const Simulator = () => {
     balanceRef.current = newBalance;
     setBalance(newBalance);
     setInitialBalance(newBalance);
+    // Reset realized P&L on fresh start
+    localStorage.setItem("timus_realized_pnl", "0");
   };
 
   // ── Portfolio sync (fire-and-forget) ────────────────────────────────────
@@ -328,6 +331,10 @@ const Simulator = () => {
           initialBalance: currentInitialBalance,
           positions: currentPositions,
           orders: currentOrders,
+          realizedPnl: (() => {
+            try { return JSON.parse(localStorage.getItem("timus_realized_pnl") ?? "0"); }
+            catch { return 0; }
+          })(),
         }),
       });
     } catch {
@@ -349,6 +356,9 @@ const Simulator = () => {
       localStorage.setItem("timus_balance", JSON.stringify(data.balance));
       localStorage.setItem("timus_initial_balance", JSON.stringify(data.initialBalance));
       localStorage.setItem("timus_positions", JSON.stringify(data.positions));
+      if (data.realizedPnl != null) {
+        localStorage.setItem("timus_realized_pnl", JSON.stringify(data.realizedPnl));
+      }
 
       // Merge orders: combine local + backend by ID so we never lose recent trades
       const localOrders: Record<string, unknown>[] = JSON.parse(localStorage.getItem("timus_orders") || "[]");
@@ -461,6 +471,14 @@ const Simulator = () => {
       const totalCost = heldEntries.reduce((s, p) => s + p.entryPrice * p.quantity, 0);
       const avgEntry = totalHeld > 0 ? totalCost / totalHeld : executionPrice;
       const profit = (executionPrice - avgEntry) * order.quantity;
+
+      // Accumulate realized P&L in localStorage
+      const prevRealized = (() => {
+        try { return JSON.parse(localStorage.getItem("timus_realized_pnl") ?? "0"); }
+        catch { return 0; }
+      })();
+      localStorage.setItem("timus_realized_pnl", JSON.stringify(prevRealized + profit));
+
       toast({
         title: "Order Filled ✓",
         description: `Sold ${order.quantity} ${order.ticker} @ $${executionPrice.toFixed(2)} — P&L: ${profit >= 0 ? "+" : ""}$${profit.toFixed(2)}`,

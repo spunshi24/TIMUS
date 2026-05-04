@@ -175,6 +175,9 @@ const Portfolio = () => {
               localStorage.setItem("timus_balance", JSON.stringify(data.balance));
               localStorage.setItem("timus_initial_balance", JSON.stringify(data.initialBalance));
               localStorage.setItem("timus_positions", JSON.stringify(data.positions));
+              if (data.realizedPnl != null) {
+                localStorage.setItem("timus_realized_pnl", JSON.stringify(data.realizedPnl));
+              }
 
               // Merge orders: combine local + backend by ID so we never lose recent trades
               const localOrders: Record<string, unknown>[] = JSON.parse(localStorage.getItem("timus_orders") || "[]");
@@ -197,9 +200,16 @@ const Portfolio = () => {
   // ── Totals ──────────────────────────────────────────────────────────────
   const totalMarketValue = holdings.reduce((s, h) => s + h.marketValue, 0);
   const portfolioValue = cash + totalMarketValue;
-  const totalPnL = portfolioValue - initialBalance;
+  const realizedPnL = (() => {
+    try { return JSON.parse(localStorage.getItem("timus_realized_pnl") ?? "0"); }
+    catch { return 0; }
+  })();
+  const totalUnrealizedPnL = holdings.reduce((s, h) => s + h.totalPnL, 0);
+  const totalPnL = totalUnrealizedPnL + realizedPnL;
   const totalPnLPct = initialBalance > 0 ? (totalPnL / initialBalance) * 100 : 0;
   const totalDayPnL = holdings.reduce((s, h) => s + h.dayChange, 0);
+  const totalCostBasis = holdings.reduce((s, h) => s + h.avgCost * h.shares, 0);
+  const totalUnrealizedPct = totalCostBasis > 0 ? (totalUnrealizedPnL / totalCostBasis) * 100 : 0;
 
   const fmt = (n: number, digits = 2) =>
     n.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -409,11 +419,11 @@ const Portfolio = () => {
                       <td className={`px-4 py-3 text-sm font-bold ${pnlColor(totalDayPnL)}`}>
                         {pnlSign(totalDayPnL)}${fmt(Math.abs(totalDayPnL))}
                       </td>
-                      <td className={`px-4 py-3 text-sm font-bold ${pnlColor(totalPnL)}`}>
-                        {pnlSign(totalPnL)}${fmt(Math.abs(totalPnL))}
+                      <td className={`px-4 py-3 text-sm font-bold ${pnlColor(totalUnrealizedPnL)}`}>
+                        {pnlSign(totalUnrealizedPnL)}${fmt(Math.abs(totalUnrealizedPnL))}
                       </td>
-                      <td className={`px-4 py-3 text-sm font-bold ${pnlColor(totalPnLPct)}`}>
-                        {pnlSign(totalPnLPct)}{fmt(Math.abs(totalPnLPct))}%
+                      <td className={`px-4 py-3 text-sm font-bold ${pnlColor(totalUnrealizedPct)}`}>
+                        {pnlSign(totalUnrealizedPct)}{fmt(Math.abs(totalUnrealizedPct))}%
                       </td>
                     </tr>
                   </tfoot>

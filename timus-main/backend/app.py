@@ -737,6 +737,7 @@ def load_portfolio():
         "initialBalance": row["initial_balance"],
         "positions": row["positions"],
         "orders": row["orders"],
+        "realizedPnl": row.get("realized_pnl", 0) or 0,
     })
 
 
@@ -751,19 +752,25 @@ def save_portfolio():
     initial_balance = data.get("initialBalance", 100000)
     positions = json.dumps(data.get("positions", []))
     orders = json.dumps(data.get("orders", []))
+    realized_pnl = data.get("realizedPnl", 0) or 0
     try:
         conn = get_db()
         cur = conn.cursor()
+        # Ensure realized_pnl column exists (auto-migration)
         cur.execute("""
-            INSERT INTO portfolios (user_id, balance, initial_balance, positions, orders, updated_at)
-            VALUES (%s, %s, %s, %s, %s, NOW())
+            ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS realized_pnl DOUBLE PRECISION DEFAULT 0
+        """)
+        cur.execute("""
+            INSERT INTO portfolios (user_id, balance, initial_balance, positions, orders, realized_pnl, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, NOW())
             ON CONFLICT (user_id) DO UPDATE SET
                 balance = EXCLUDED.balance,
                 initial_balance = EXCLUDED.initial_balance,
                 positions = EXCLUDED.positions,
                 orders = EXCLUDED.orders,
+                realized_pnl = EXCLUDED.realized_pnl,
                 updated_at = NOW()
-        """, (user_id, balance, initial_balance, positions, orders))
+        """, (user_id, balance, initial_balance, positions, orders, realized_pnl))
         conn.commit()
         cur.close()
         conn.close()
