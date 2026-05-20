@@ -77,62 +77,73 @@ def get_db():
 
 
 def init_db():
-    """Create tables on first deploy. Called at module load."""
+    """Create tables on first deploy. Retries with backoff if DB isn't ready yet."""
     if not DATABASE_URL:
         return  # local dev without DB — skip silently
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            username TEXT UNIQUE NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT NOW()
-        );
-    """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS portfolios (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-            balance FLOAT,
-            initial_balance FLOAT,
-            positions JSONB DEFAULT '[]',
-            orders JSONB DEFAULT '[]',
-            updated_at TIMESTAMP DEFAULT NOW(),
-            UNIQUE(user_id)
-        );
-    """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS watchlists (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-            ticker TEXT NOT NULL,
-            name TEXT NOT NULL DEFAULT '',
-            added_at TIMESTAMP DEFAULT NOW(),
-            UNIQUE(user_id, ticker)
-        );
-    """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS game_rooms (
-            id SERIAL PRIMARY KEY,
-            code VARCHAR(8) UNIQUE NOT NULL,
-            creator_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-            created_at TIMESTAMP DEFAULT NOW()
-        );
-    """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS game_room_members (
-            id SERIAL PRIMARY KEY,
-            game_room_id INTEGER REFERENCES game_rooms(id) ON DELETE CASCADE,
-            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-            joined_at TIMESTAMP DEFAULT NOW(),
-            UNIQUE(game_room_id, user_id)
-        );
-    """)
-    conn.commit()
-    cur.close()
-    conn.close()
+    delays = [2, 4, 8, 16, 30]
+    for attempt, delay in enumerate(delays, 1):
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    username TEXT UNIQUE NOT NULL,
+                    email TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW()
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS portfolios (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    balance FLOAT,
+                    initial_balance FLOAT,
+                    positions JSONB DEFAULT '[]',
+                    orders JSONB DEFAULT '[]',
+                    updated_at TIMESTAMP DEFAULT NOW(),
+                    UNIQUE(user_id)
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS watchlists (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    ticker TEXT NOT NULL,
+                    name TEXT NOT NULL DEFAULT '',
+                    added_at TIMESTAMP DEFAULT NOW(),
+                    UNIQUE(user_id, ticker)
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS game_rooms (
+                    id SERIAL PRIMARY KEY,
+                    code VARCHAR(8) UNIQUE NOT NULL,
+                    creator_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    created_at TIMESTAMP DEFAULT NOW()
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS game_room_members (
+                    id SERIAL PRIMARY KEY,
+                    game_room_id INTEGER REFERENCES game_rooms(id) ON DELETE CASCADE,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    joined_at TIMESTAMP DEFAULT NOW(),
+                    UNIQUE(game_room_id, user_id)
+                );
+            """)
+            conn.commit()
+            cur.close()
+            conn.close()
+            logger.info("Database initialized successfully")
+            return
+        except Exception as e:
+            logger.warning("init_db attempt %d failed: %s", attempt, e)
+            if attempt < len(delays):
+                logger.info("Retrying in %ds...", delay)
+                time.sleep(delay)
+    logger.error("init_db failed after all retries — app will start but DB routes may error")
 
 # Curated list of real, actively-traded tickers used for autocomplete search.
 # Covers S&P 500 large-caps, popular tech, financials, healthcare, energy, etc.
