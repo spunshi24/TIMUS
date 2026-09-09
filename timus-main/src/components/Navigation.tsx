@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout, openAuthModal } = useAuth();
   const navigate = useNavigate();
 
   const scrollTo = (id: string) => {
@@ -56,12 +56,12 @@ const Navigation = () => {
               </button>
             </>
           ) : (
-            <Link
-              to="/simulator"
+            <button
+              onClick={openAuthModal}
               className="px-4 py-2 rounded-md bg-foreground text-background text-sm font-semibold hover:opacity-90 transition-opacity"
             >
               Sign In
-            </Link>
+            </button>
           )}
         </div>
       </div>
@@ -105,13 +105,12 @@ const Navigation = () => {
               <LogOut className="w-3.5 h-3.5" /> Logout
             </button>
           ) : (
-            <Link
-              to="/simulator"
-              onClick={() => setIsOpen(false)}
-              className="block text-sm font-semibold text-foreground py-2.5"
+            <button
+              onClick={() => { setIsOpen(false); openAuthModal(); }}
+              className="block w-full text-left text-sm font-semibold text-foreground py-2.5"
             >
               Sign In →
-            </Link>
+            </button>
           )}
         </div>
       )}

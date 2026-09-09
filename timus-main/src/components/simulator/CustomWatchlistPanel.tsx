@@ -240,6 +240,9 @@ const CustomWatchlistPanel = ({ user, token, onSelectTicker }: CustomWatchlistPa
       if (res.ok) {
         setActionState((prev) => ({ ...prev, [ticker]: "added" }));
         setWatchlistTickers((prev) => new Set([...prev, ticker]));
+        // Close the add panel after a successful add — reopen via "Add Stocks"
+        setIsOpen(false);
+        setSearchQuery("");
         // Reload the saved list
         await loadWatchlist();
         setTimeout(() => setActionState((prev) => ({ ...prev, [ticker]: "idle" })), 2000);

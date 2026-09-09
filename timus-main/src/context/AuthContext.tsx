@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from "react";
 import { API_BASE } from "@/lib/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -8,12 +8,21 @@ export interface AuthUser {
   email: string;
 }
 
+type AuthSuccessHandler = (() => void | Promise<void>) | null;
+
 interface AuthContextValue {
   user: AuthUser | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => void;
+  // Globally shared auth modal (rendered once in App.tsx)
+  authModalOpen: boolean;
+  openAuthModal: () => void;
+  closeAuthModal: () => void;
+  // Pages can register a callback to run after a successful login/signup
+  setAuthSuccessHandler: (fn: AuthSuccessHandler) => void;
+  notifyAuthSuccess: () => void;
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -76,13 +85,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("timus_initial_balance");
     localStorage.removeItem("timus_positions");
     localStorage.removeItem("timus_orders");
+    localStorage.removeItem("timus_working_orders");
     localStorage.removeItem("timus_anon_trades");
     setUser(null);
     setToken(null);
   };
 
+  // ── Global auth modal state ─────────────────────────────────────────────
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const authSuccessHandlerRef = useRef<AuthSuccessHandler>(null);
+
+  const openAuthModal = useCallback(() => setAuthModalOpen(true), []);
+  const closeAuthModal = useCallback(() => setAuthModalOpen(false), []);
+  const setAuthSuccessHandler = useCallback((fn: AuthSuccessHandler) => {
+    authSuccessHandlerRef.current = fn;
+  }, []);
+  const notifyAuthSuccess = useCallback(() => {
+    authSuccessHandlerRef.current?.();
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        login,
+        register,
+        logout,
+        authModalOpen,
+        openAuthModal,
+        closeAuthModal,
+        setAuthSuccessHandler,
+        notifyAuthSuccess,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

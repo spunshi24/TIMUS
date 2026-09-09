@@ -40,10 +40,20 @@ const SimulatorHeader = ({
   const [suggestions, setSuggestions] = useState<TickerResult[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Skips the next debounced search when query changed programmatically
+  // (committing a pick or syncing from the parent), not from user typing —
+  // otherwise the autocomplete re-fetches the just-picked ticker and reopens.
+  const skipSearchRef = useRef(false);
 
-  // Keep local query in sync when parent changes ticker externally
+  // Keep local query in sync when parent changes ticker externally.
+  // Only set the skip flag when the value actually changes — otherwise the
+  // search effect never runs to clear it and would swallow the next keystroke.
   useEffect(() => {
-    setQuery(selectedTicker);
+    setQuery((prev) => {
+      if (prev === selectedTicker) return prev;
+      skipSearchRef.current = true;
+      return selectedTicker;
+    });
   }, [selectedTicker]);
 
   // Close dropdown on outside click
@@ -59,6 +69,10 @@ const SimulatorHeader = ({
 
   // Debounced autocomplete fetch
   useEffect(() => {
+    if (skipSearchRef.current) {
+      skipSearchRef.current = false;
+      return;
+    }
     if (!query || query.trim().length === 0) {
       setSuggestions([]);
       setShowDropdown(false);
@@ -80,6 +94,7 @@ const SimulatorHeader = ({
   }, [query]);
 
   const commitTicker = (ticker: string) => {
+    skipSearchRef.current = true;
     setQuery(ticker);
     setSuggestions([]);
     setShowDropdown(false);

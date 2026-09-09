@@ -3,7 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/context/AuthContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
+import AuthModal from "@/components/AuthModal";
 import Index from "./pages/Index";
 import Simulator from "./pages/Simulator";
 import Portfolio from "./pages/Portfolio";
@@ -12,12 +13,25 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+// Single app-wide auth modal — any page opens it via useAuth().openAuthModal()
+const GlobalAuthModal = () => {
+  const { authModalOpen, closeAuthModal, notifyAuthSuccess } = useAuth();
+  return (
+    <AuthModal
+      open={authModalOpen}
+      onClose={closeAuthModal}
+      onSuccess={notifyAuthSuccess}
+    />
+  );
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
         <Toaster />
         <Sonner />
+        <GlobalAuthModal />
         <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <Routes>
             <Route path="/" element={<Index />} />

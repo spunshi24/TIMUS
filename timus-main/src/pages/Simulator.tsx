@@ -8,10 +8,10 @@ import TurboPanel from "@/components/simulator/TurboPanel";
 import WatchlistPanel from "@/components/simulator/WatchlistPanel";
 import CustomWatchlistPanel from "@/components/simulator/CustomWatchlistPanel";
 import GameRoomPanel from "@/components/simulator/GameRoomPanel";
-import AuthModal from "@/components/AuthModal";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { API_BASE } from "@/lib/api";
+import { mergeOrders } from "@/lib/mergeOrders";
 
 export interface Position {
   id: string;
@@ -209,10 +209,9 @@ function DemoContactModal({ onClose }: { onClose: () => void }) {
 
 const Simulator = () => {
   const { toast } = useToast();
-  const { user, token } = useAuth();
+  const { user, token, openAuthModal, setAuthSuccessHandler } = useAuth();
 
   const [selectedTicker, setSelectedTicker] = useState("");
-  const [authModalOpen, setAuthModalOpen] = useState(false);
   const selectedTickerRef = useRef("");
 
   const [balance, setBalance] = useState<number>(() =>
@@ -242,7 +241,15 @@ const Simulator = () => {
   const positionsRef = useRef<Position[]>(positions);
   const ordersRef = useRef<Order[]>(orders);
   const pricesByTickerRef = useRef<Record<string, number>>({});
-  const workingOrdersRef = useRef<Order[]>([]);
+  const workingOrdersRef = useRef<Order[]>(
+    loadFromStorage("timus_working_orders", [])
+  );
+
+  // Working orders must survive refreshes: every mutation goes through here.
+  const setWorkingOrders = useCallback((next: Order[]) => {
+    workingOrdersRef.current = next;
+    localStorage.setItem("timus_working_orders", JSON.stringify(next));
+  }, []);
 
   // ── Persist to localStorage ─────────────────────────────────────────────
   useEffect(() => {
@@ -273,11 +280,22 @@ const Simulator = () => {
       setPositions([]);
       setOrders([]);
       localStorage.setItem("timus_realized_pnl", "0");
+      setWorkingOrders([]);
       selectedTickerRef.current = "";
       setSelectedTicker("");
     }
     prevUserRef.current = user;
-  }, [user]);
+  }, [user, setWorkingOrders]);
+
+  // ── Jump straight to a ticker when another page asked for it ────────────
+  useEffect(() => {
+    const goto = sessionStorage.getItem("timus_goto_ticker");
+    if (goto) {
+      sessionStorage.removeItem("timus_goto_ticker");
+      selectedTickerRef.current = goto;
+      setSelectedTicker(goto);
+    }
+  }, []);
 
   // ── T key shortcut to toggle Turbo panel ────────────────────────────────
   useEffect(() => {
@@ -363,10 +381,7 @@ const Simulator = () => {
       // Merge orders: combine local + backend by ID so we never lose recent trades
       const localOrders: Record<string, unknown>[] = JSON.parse(localStorage.getItem("timus_orders") || "[]");
       const backendOrders: Record<string, unknown>[] = Array.isArray(data.orders) ? data.orders : [];
-      const byId = new Map<string, Record<string, unknown>>();
-      for (const o of backendOrders) byId.set(o.id as string, o);
-      for (const o of localOrders) byId.set(o.id as string, o); // local wins on conflict
-      const mergedOrders = [...byId.values()];
+      const mergedOrders = mergeOrders(backendOrders, localOrders);
       localStorage.setItem("timus_orders", JSON.stringify(mergedOrders));
 
       setBalance(data.balance);
@@ -399,8 +414,12 @@ const Simulator = () => {
     // Using ordersRef directly (instead of waiting for the useEffect) ensures
     // that syncPortfolio immediately sees the correct order status.
     const commitOrderStatus = (status: "filled" | "cancelled") => {
+      // A filled order records its actual execution price — for market orders
+      // (which never had one) and for limit/stop (whose trigger may differ).
       const next = ordersRef.current.map((o) =>
-        o.id === order.id ? { ...o, status } : o
+        o.id === order.id
+          ? { ...o, status, ...(status === "filled" ? { price: executionPrice } : {}) }
+          : o
       );
       ordersRef.current = next;
       setOrders(next);
@@ -525,8 +544,37 @@ const Simulator = () => {
         stillWorking.push(order);
       }
     }
-    workingOrdersRef.current = stillWorking;
-  }, [fillOrder]);
+    if (stillWorking.length !== workingOrdersRef.current.length) {
+      setWorkingOrders(stillWorking);
+    }
+  }, [fillOrder, setWorkingOrders]);
+
+  // ── Background watcher: poll prices for ALL tickers with working orders ──
+  // Runs regardless of which chart (if any) is open, so limit/stop orders
+  // keep evaluating after you navigate away — and after a full page refresh.
+  useEffect(() => {
+    const checkAllWorkingOrders = async () => {
+      const working = workingOrdersRef.current;
+      if (working.length === 0) return;
+      const tickers = [...new Set(working.map((o) => o.ticker))];
+      const results = await Promise.allSettled(
+        tickers.map((t) =>
+          fetch(`${API_BASE}/api/quote/${t}`).then((r) => r.json())
+        )
+      );
+      results.forEach((result, i) => {
+        if (result.status !== "fulfilled") return;
+        const price = result.value?.price;
+        if (typeof price !== "number" || price <= 0) return;
+        pricesByTickerRef.current = { ...pricesByTickerRef.current, [tickers[i]]: price };
+        setPricesByTicker((prev) => ({ ...prev, [tickers[i]]: price }));
+        checkWorkingOrders(tickers[i], price);
+      });
+    };
+    checkAllWorkingOrders();
+    const interval = setInterval(checkAllWorkingOrders, 15_000);
+    return () => clearInterval(interval);
+  }, [checkWorkingOrders]);
 
   // ── Price update from ChartPanel ────────────────────────────────────────
   const handlePriceUpdate = useCallback((price: number) => {
@@ -542,12 +590,18 @@ const Simulator = () => {
     await loadPortfolioFromBackend();
   }, [syncPortfolio, loadPortfolioFromBackend, initialBalance]);
 
+  // Wire this page's post-login sync into the globally rendered AuthModal
+  useEffect(() => {
+    setAuthSuccessHandler(handleAuthSuccess);
+    return () => setAuthSuccessHandler(null);
+  }, [setAuthSuccessHandler, handleAuthSuccess]);
+
   // ── Shared order guard (auth cap + market hours) ────────────────────────
   const guardOrder = (): boolean => {
     if (!user) {
       const anonCount = parseInt(localStorage.getItem("timus_anon_trades") || "0", 10);
       if (anonCount >= 4) {
-        setAuthModalOpen(true);
+        openAuthModal();
         return false;
       }
     }
@@ -629,7 +683,7 @@ const Simulator = () => {
         setOrders((prev) =>
           prev.map((o) => (o.id === newOrder.id ? workingOrder : o))
         );
-        workingOrdersRef.current = [...workingOrdersRef.current, workingOrder];
+        setWorkingOrders([...workingOrdersRef.current, workingOrder]);
         toast({
           title: "Limit Order Working",
           description: `${order.side === "buy" ? "Buy" : "Sell"} ${order.quantity} ${order.ticker} — waiting for $${triggerPrice.toFixed(2)} (now $${livePrice.toFixed(2)})`,
@@ -655,7 +709,7 @@ const Simulator = () => {
         setOrders((prev) =>
           prev.map((o) => (o.id === newOrder.id ? workingOrder : o))
         );
-        workingOrdersRef.current = [...workingOrdersRef.current, workingOrder];
+        setWorkingOrders([...workingOrdersRef.current, workingOrder]);
         toast({
           title: "Stop Order Working",
           description: `${order.side === "sell" ? "Stop-loss" : "Stop-buy"} at $${triggerPrice.toFixed(2)} — triggers when price ${order.side === "sell" ? "falls to" : "rises to"} $${triggerPrice.toFixed(2)} (now $${livePrice.toFixed(2)})`,
@@ -724,7 +778,7 @@ const Simulator = () => {
           selectedTicker={selectedTicker}
           onTickerChange={handleTickerChange}
           onBalanceChange={handleBalanceChange}
-          onAuthClick={() => setAuthModalOpen(true)}
+          onAuthClick={openAuthModal}
           onShowWatchlist={handleShowWatchlist}
         />
 
@@ -778,7 +832,7 @@ const Simulator = () => {
           <GameRoomPanel
             user={user}
             token={token}
-            onAuthClick={() => setAuthModalOpen(true)}
+            onAuthClick={openAuthModal}
           />
         </div>
       </div>
@@ -814,13 +868,6 @@ const Simulator = () => {
 
       {/* Professor demo contact card */}
       {demoCardOpen && <DemoContactModal onClose={() => setDemoCardOpen(false)} />}
-
-      {/* Auth Modal — shown when anonymous user hits 5-trade limit */}
-      <AuthModal
-        open={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        onSuccess={handleAuthSuccess}
-      />
     </div>
   );
 };

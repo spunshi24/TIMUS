@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
-import { TrendingUp, TrendingDown, RefreshCw, BarChart2 } from "lucide-react";
+import { TrendingUp, TrendingDown, RefreshCw, BarChart2, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { mergeOrders } from "@/lib/mergeOrders";
 import PositionsPanel from "@/components/simulator/PositionsPanel";
 import type { Position, Order } from "./Simulator";
 import { API_BASE } from "@/lib/api";
@@ -182,10 +184,7 @@ const Portfolio = () => {
               // Merge orders: combine local + backend by ID so we never lose recent trades
               const localOrders: Record<string, unknown>[] = JSON.parse(localStorage.getItem("timus_orders") || "[]");
               const backendOrders: Record<string, unknown>[] = Array.isArray(data.orders) ? data.orders : [];
-              const byId = new Map<string, Record<string, unknown>>();
-              for (const o of backendOrders) byId.set(o.id as string, o);
-              for (const o of localOrders) byId.set(o.id as string, o); // local wins on conflict
-              localStorage.setItem("timus_orders", JSON.stringify([...byId.values()]));
+              localStorage.setItem("timus_orders", JSON.stringify(mergeOrders(backendOrders, localOrders)));
             }
           }
         } catch {
@@ -257,31 +256,49 @@ const Portfolio = () => {
                 value: `$${fmt(portfolioValue)}`,
                 sub: null,
                 color: "",
+                tooltip: null,
               },
               {
                 label: "Total P&L",
                 value: `${pnlSign(totalPnL)}$${fmt(Math.abs(totalPnL))}`,
                 sub: `${pnlSign(totalPnLPct)}${fmt(Math.abs(totalPnLPct))}%`,
                 color: pnlColor(totalPnL),
+                tooltip:
+                  "Includes realized P&L from closed trades plus unrealized P&L on current holdings.",
               },
               {
                 label: "Day P&L",
                 value: `${pnlSign(totalDayPnL)}$${fmt(Math.abs(totalDayPnL))}`,
                 sub: null,
                 color: pnlColor(totalDayPnL),
+                tooltip:
+                  "Reflects the ticker's full move for the trading day, not just the change since you opened the position.",
               },
               {
                 label: "Cash",
                 value: `$${fmt(cash)}`,
                 sub: `${fmt((cash / portfolioValue) * 100, 1)}% of portfolio`,
                 color: "",
+                tooltip: null,
               },
-            ].map(({ label, value, sub, color }) => (
+            ].map(({ label, value, sub, color, tooltip }) => (
               <div
                 key={label}
                 className="p-5 rounded-lg border-2 border-border bg-card shadow-sm"
               >
-                <p className="text-xs text-muted-foreground mb-1">{label}</p>
+                <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                  {label}
+                  {tooltip && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3 h-3 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[240px]">
+                        <p>{tooltip}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </p>
                 <p className={`text-2xl font-bold ${color || "text-foreground"}`}>{value}</p>
                 {sub && <p className={`text-xs mt-1 ${color || "text-muted-foreground"}`}>{sub}</p>}
               </div>
