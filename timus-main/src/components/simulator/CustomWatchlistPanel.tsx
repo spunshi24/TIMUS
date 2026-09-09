@@ -269,7 +269,9 @@ const CustomWatchlistPanel = ({ user, token, onSelectTicker }: CustomWatchlistPa
 
   if (!user) return null;
 
-  const displayList = searchQuery.trim() ? searchResults : top50;
+  const displayList: StockItem[] = searchQuery.trim()
+    ? searchResults
+    : top50.map((t) => ({ ...t, price: null, change_pct: null }));
 
   return (
     <div className="p-6 rounded-lg border-2 border-border bg-card shadow-lg">

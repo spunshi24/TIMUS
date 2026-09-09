@@ -5,10 +5,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { SidebarProvider } from "@/context/SidebarContext";
 import AuthModal from "@/components/AuthModal";
 import Index from "./pages/Index";
 import Simulator from "./pages/Simulator";
 import Portfolio from "./pages/Portfolio";
+import Watchlist from "./pages/Watchlist";
+import News from "./pages/News";
+import Gameroom from "./pages/Gameroom";
 import Leaderboard from "./pages/Leaderboard";
 import NotFound from "./pages/NotFound";
 
@@ -33,6 +37,7 @@ const App = () => (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <TooltipProvider>
       <AuthProvider>
+        <SidebarProvider>
         <Toaster />
         <Sonner />
         <GlobalAuthModal />
@@ -41,11 +46,15 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/simulator" element={<Simulator />} />
             <Route path="/portfolio" element={<Portfolio />} />
+            <Route path="/watchlist" element={<Watchlist />} />
+            <Route path="/news" element={<News />} />
+            <Route path="/gameroom" element={<Gameroom />} />
             <Route path="/leaderboard/:code" element={<Leaderboard />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+        </SidebarProvider>
       </AuthProvider>
       </TooltipProvider>
     </ThemeProvider>

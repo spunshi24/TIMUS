@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import Navigation from "@/components/Navigation";
+import AppShell from "@/components/shell/AppShell";
 import { TrendingUp, TrendingDown, RefreshCw, BarChart2, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -214,9 +214,8 @@ const Portfolio = () => {
   const pnlSign = (n: number) => (n >= 0 ? "+" : "-");
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation />
-      <div className="pt-16">
+    <AppShell>
+      <div>
         <div className="container mx-auto px-4 py-10">
 
           {/* ── Page header ──────────────────────────────────────────────── */}
@@ -554,7 +553,7 @@ const Portfolio = () => {
           </div>
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 };
 

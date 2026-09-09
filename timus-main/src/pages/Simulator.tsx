@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Zap, X, Mail, Github, Linkedin, Copy, Check } from "lucide-react";
-import Navigation from "@/components/Navigation";
+import { Zap, X } from "lucide-react";
+import AppShell from "@/components/shell/AppShell";
+import ContactCard from "@/components/shell/ContactCard";
 import SimulatorHeader from "@/components/simulator/SimulatorHeader";
 import ChartPanel from "@/components/simulator/ChartPanel";
 import OrderPanel from "@/components/simulator/OrderPanel";
@@ -107,98 +108,6 @@ function BlockedModal({ message, onDismiss }: { message: string; onDismiss: () =
           onClick={onDismiss}
         >
           Dismiss
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Professor demo contact card ─────────────────────────────────────────────
-const EMAIL = "sumitpunshi@gmail.com";
-
-function DemoContactModal({ onClose }: { onClose: () => void }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(EMAIL).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)" }}
-      onClick={onClose}
-    >
-      <div
-        className="relative bg-card rounded-2xl border-2 border-border p-8 max-w-sm w-full text-center"
-        style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        <div className="w-14 h-14 rounded-full bg-foreground flex items-center justify-center mx-auto mb-5">
-          <Mail className="w-7 h-7 text-background" />
-        </div>
-
-        <h3 className="text-xl font-bold text-foreground mb-1">Let's set up your demo</h3>
-        <p className="text-sm text-muted-foreground mb-6">
-          Reach out and we'll walk through a live session with your class.
-        </p>
-
-        {/* Email row */}
-        <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-muted border border-border mb-5">
-          <span className="font-mono text-sm font-semibold text-foreground select-all">{EMAIL}</span>
-          <button
-            onClick={handleCopy}
-            className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-            title="Copy email"
-          >
-            {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-          </button>
-        </div>
-
-        {/* Social links */}
-        <div className="flex gap-3 mb-5">
-          <button
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-border hover:bg-muted transition-colors text-sm font-medium"
-            onClick={() => (window.location.href = "mailto:" + EMAIL + "?subject=TiMUS%20demo%20request")}
-          >
-            <Mail className="w-4 h-4" />
-            Email
-          </button>
-          <a
-            href="https://github.com/spunshi24"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-border hover:bg-muted transition-colors text-sm font-medium"
-          >
-            <Github className="w-4 h-4" />
-            GitHub
-          </a>
-          <a
-            href="https://www.linkedin.com/in/sumit-punshi"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-border hover:bg-muted transition-colors text-sm font-medium"
-          >
-            <Linkedin className="w-4 h-4" />
-            LinkedIn
-          </a>
-        </div>
-
-        <button
-          className="w-full py-2.5 rounded-lg bg-muted hover:bg-muted/70 text-sm font-semibold transition-colors"
-          onClick={onClose}
-        >
-          Close
         </button>
       </div>
     </div>
@@ -754,9 +663,8 @@ const Simulator = () => {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation />
-      <div className="pt-16">
+    <AppShell>
+      <div>
         {/* Professor demo banner */}
         {isProfDemo && (
           <div className="bg-yellow-500/10 border-b border-yellow-500/40 px-4 py-3 text-center">
@@ -862,8 +770,16 @@ const Simulator = () => {
       )}
 
       {/* Professor demo contact card */}
-      {demoCardOpen && <DemoContactModal onClose={() => setDemoCardOpen(false)} />}
-    </div>
+      {demoCardOpen && (
+        <ContactCard
+          title="Let's set up your demo"
+          subtitle="Reach out and we'll walk through a live session with your class."
+          showGithub
+          mailSubject="TiMUS demo request"
+          onClose={() => setDemoCardOpen(false)}
+        />
+      )}
+    </AppShell>
   );
 };
 
