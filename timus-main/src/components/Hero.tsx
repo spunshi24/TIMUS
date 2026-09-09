@@ -40,20 +40,20 @@ const Hero = () => {
 
             {/* Right: simulator UI mockup */}
             <div className="flex items-center justify-center">
-              <div className="w-full max-w-lg rounded-xl border-2 border-zinc-700 bg-zinc-950 shadow-2xl overflow-hidden text-left">
+              <div className="w-full max-w-lg rounded-xl border-2 border-border bg-card shadow-2xl overflow-hidden text-left">
                 {/* Top bar */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                   <div className="flex items-center gap-3">
-                    <span className="font-bold text-white">AAPL</span>
-                    <span className="text-zinc-400 text-xs">Apple Inc.</span>
+                    <span className="font-bold text-foreground">AAPL</span>
+                    <span className="text-muted-foreground text-xs">Apple Inc.</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-white font-bold">$189.42</span>
-                    <span className="text-green-400 text-xs ml-2">+1.24%</span>
+                    <span className="text-foreground font-bold">$189.42</span>
+                    <span className="text-success text-xs ml-2">+1.24%</span>
                   </div>
                 </div>
                 {/* Fake chart */}
-                <div className="px-4 pt-4 pb-2 bg-zinc-950">
+                <div className="px-4 pt-4 pb-2">
                   <svg viewBox="0 0 320 90" className="w-full h-24" preserveAspectRatio="none">
                     <defs>
                       <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
@@ -76,17 +76,17 @@ const Hero = () => {
                 </div>
                 {/* Order buttons */}
                 <div className="grid grid-cols-2 gap-3 px-4 pb-3">
-                  <div className="py-3 rounded-lg bg-green-600/20 border border-green-600/40 text-center text-green-400 text-sm font-bold">
+                  <div className="py-3 rounded-lg bg-success/15 border border-success/40 text-center text-success text-sm font-bold">
                     Buy
                   </div>
-                  <div className="py-3 rounded-lg bg-rose-600/20 border border-rose-600/40 text-center text-rose-400 text-sm font-bold">
+                  <div className="py-3 rounded-lg bg-destructive/15 border border-destructive/40 text-center text-destructive text-sm font-bold">
                     Sell
                   </div>
                 </div>
                 {/* Footer row */}
-                <div className="px-4 pb-4 flex items-center justify-between text-xs text-zinc-500">
-                  <span>Balance: <span className="text-white font-semibold">$100,000</span></span>
-                  <span className="text-yellow-400 font-semibold flex items-center gap-1">
+                <div className="px-4 pb-4 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Balance: <span className="text-foreground font-semibold">$100,000</span></span>
+                  <span className="text-yellow-600 dark:text-yellow-400 font-semibold flex items-center gap-1">
                     ⚡ Turbo
                   </span>
                   <span>0 positions</span>

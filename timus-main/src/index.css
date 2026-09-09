@@ -76,6 +76,62 @@ All colors MUST be HSL.
     --sidebar-border: 0 0% 90%;
     --sidebar-ring: 0 0% 20%;
   }
+
+  .dark {
+    /* TiMUS Dark Theme - near-black surfaces, off-white text,
+       same green/red accents so P&L coloring reads identically */
+    --background: 0 0% 6%;
+    --foreground: 0 0% 93%;
+
+    --card: 0 0% 9%;
+    --card-foreground: 0 0% 93%;
+
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 93%;
+
+    --primary: 0 0% 93%;
+    --primary-foreground: 0 0% 8%;
+
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 90%;
+
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 62%;
+
+    --accent: 142 71% 45%;
+    --accent-foreground: 0 0% 5%;
+
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 5%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 18%;
+    --input: 0 0% 16%;
+    --ring: 0 0% 70%;
+
+    /* Tech specific */
+    --grid-lines: 0 0% 13%;
+    --hover-bg: 0 0% 11%;
+
+    /* Gradients */
+    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 6%), hsl(0 0% 8%));
+
+    /* Shadows — deeper in dark mode so elevation still reads */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5);
+
+    --sidebar-background: 0 0% 8%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 0 0% 93%;
+    --sidebar-primary-foreground: 0 0% 8%;
+    --sidebar-accent: 0 0% 14%;
+    --sidebar-accent-foreground: 0 0% 90%;
+    --sidebar-border: 0 0% 18%;
+    --sidebar-ring: 0 0% 70%;
+  }
 }
 
 @layer base {

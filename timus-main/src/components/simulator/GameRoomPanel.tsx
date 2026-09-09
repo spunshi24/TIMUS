@@ -34,7 +34,7 @@ function LeaderboardTable({
 }) {
   if (entries.length === 0) {
     return (
-      <p className="text-zinc-500 text-sm py-4 text-center italic">
+      <p className="text-muted-foreground text-sm py-4 text-center italic">
         No data yet.
       </p>
     );
@@ -43,7 +43,7 @@ function LeaderboardTable({
   return (
     <table className="w-full text-sm">
       <thead>
-        <tr className="text-zinc-500 text-[11px] uppercase tracking-wider">
+        <tr className="text-muted-foreground text-[11px] uppercase tracking-wider">
           <th className="text-left py-2 px-3 font-medium">Rank</th>
           <th className="text-left py-2 px-3 font-medium">Player</th>
           <th className="text-right py-2 px-3 font-medium">Return</th>
@@ -57,29 +57,29 @@ function LeaderboardTable({
           return (
             <tr
               key={e.user_id}
-              className={`border-t border-zinc-800 ${
-                isYou ? "bg-green-900/20" : ""
+              className={`border-t border-border ${
+                isYou ? "bg-success/10" : ""
               }`}
             >
-              <td className="py-2.5 px-3 font-mono text-zinc-400">
+              <td className="py-2.5 px-3 font-mono text-muted-foreground">
                 {String(e.rank).padStart(2, "0")}
               </td>
               <td className="py-2.5 px-3">
                 {isYou ? (
-                  <span className="font-bold text-yellow-400">YOU</span>
+                  <span className="font-bold text-yellow-600 dark:text-yellow-400">YOU</span>
                 ) : (
-                  <span className="text-zinc-200">{e.username}</span>
+                  <span className="text-foreground">{e.username}</span>
                 )}
               </td>
               <td
                 className={`py-2.5 px-3 text-right font-semibold ${
-                  e.return_pct >= 0 ? "text-green-400" : "text-red-400"
+                  e.return_pct >= 0 ? "text-success" : "text-destructive"
                 }`}
               >
                 {e.return_pct >= 0 ? "+" : ""}
                 {e.return_pct.toFixed(2)}%
               </td>
-              <td className="py-2.5 px-3 text-right text-zinc-300">
+              <td className="py-2.5 px-3 text-right text-foreground/80">
                 ${e.equity.toLocaleString(undefined, {
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
@@ -87,9 +87,9 @@ function LeaderboardTable({
               </td>
               <td className="py-2.5 px-1 text-center">
                 {e.direction === "up" ? (
-                  <span className="text-green-400">▲</span>
+                  <span className="text-success">▲</span>
                 ) : (
-                  <span className="text-red-400">▼</span>
+                  <span className="text-destructive">▼</span>
                 )}
               </td>
             </tr>
@@ -280,7 +280,7 @@ const GameRoomPanel = ({ user, token, onAuthClick }: GameRoomPanelProps) => {
             className="text-muted-foreground hover:text-foreground transition-colors"
             title="Copy room code"
           >
-            {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+            {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
           </button>
         </div>
         <p className="text-sm text-muted-foreground mb-5">
@@ -288,16 +288,16 @@ const GameRoomPanel = ({ user, token, onAuthClick }: GameRoomPanelProps) => {
         </p>
 
         {/* Leaderboard */}
-        <div className="rounded-xl bg-zinc-900 border border-zinc-800 overflow-hidden">
+        <div className="rounded-xl bg-muted/40 border border-border overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Leaderboard
             </span>
-            <span className="flex items-center gap-1.5 text-xs text-zinc-500">
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
               </span>
               LIVE
             </span>
@@ -305,11 +305,11 @@ const GameRoomPanel = ({ user, token, onAuthClick }: GameRoomPanelProps) => {
 
           <div className="p-2">
             {lbLoading && leaderboard.length === 0 ? (
-              <p className="text-zinc-500 text-sm py-6 text-center">
+              <p className="text-muted-foreground text-sm py-6 text-center">
                 Loading leaderboard...
               </p>
             ) : leaderboard.length <= 1 ? (
-              <p className="text-zinc-500 text-sm py-6 text-center italic">
+              <p className="text-muted-foreground text-sm py-6 text-center italic">
                 Share your room code to see the leaderboard. Waiting for players to join...
               </p>
             ) : (

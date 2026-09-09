@@ -74,36 +74,36 @@ function BlockedModal({ message, onDismiss }: { message: string; onDismiss: () =
       onClick={onDismiss}
     >
       <div
-        className="bg-zinc-950 border-2 border-red-500/50 rounded-2xl p-8 max-w-sm w-full text-center"
+        className="relative bg-card border-2 border-destructive/50 rounded-2xl p-8 max-w-sm w-full text-center"
         style={{ boxShadow: "0 0 60px rgba(239,68,68,0.25), 0 24px 60px rgba(0,0,0,0.6)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={onDismiss}
-          className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"
+          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
         <div className="text-5xl mb-4">{isMarketClosed ? "🔔" : "🚫"}</div>
-        <h3 className="text-lg font-bold text-white mb-2 leading-snug">{message}</h3>
+        <h3 className="text-lg font-bold text-foreground mb-2 leading-snug">{message}</h3>
         {isMarketClosed && (
-          <p className="text-zinc-400 text-sm mt-2 leading-relaxed">
+          <p className="text-muted-foreground text-sm mt-2 leading-relaxed">
             US equity markets are open<br />
-            <span className="text-white font-semibold">Monday – Friday, 9:30 AM – 4:00 PM ET</span>
+            <span className="text-foreground font-semibold">Monday – Friday, 9:30 AM – 4:00 PM ET</span>
           </p>
         )}
         {message.includes("INSUFFICIENT FUNDS") && (
-          <p className="text-zinc-400 text-sm mt-2">
+          <p className="text-muted-foreground text-sm mt-2">
             Reduce your order size or add more virtual cash.
           </p>
         )}
         {message.includes("INSUFFICIENT SHARES") && (
-          <p className="text-zinc-400 text-sm mt-2">
+          <p className="text-muted-foreground text-sm mt-2">
             You don&apos;t hold enough shares for this order.
           </p>
         )}
         <button
-          className="mt-6 px-8 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl font-semibold transition-colors text-sm"
+          className="mt-6 px-8 py-2.5 bg-muted hover:bg-muted/70 text-foreground rounded-xl font-semibold transition-colors text-sm"
           onClick={onDismiss}
         >
           Dismiss
@@ -759,8 +759,8 @@ const Simulator = () => {
       <div className="pt-16">
         {/* Professor demo banner */}
         {isProfDemo && (
-          <div className="bg-zinc-900 border-b border-yellow-500/40 px-4 py-3 text-center">
-            <span className="text-yellow-400 font-semibold text-sm">
+          <div className="bg-yellow-500/10 border-b border-yellow-500/40 px-4 py-3 text-center">
+            <span className="text-yellow-600 dark:text-yellow-400 font-semibold text-sm">
               👋 Educator preview — try a few live trades below. Ready to use TiMUS with your class? Hit the{" "}
               <strong>Book a demo</strong> button below.
             </span>
@@ -817,7 +817,7 @@ const Simulator = () => {
             <div className="flex justify-center py-2">
               <button
                 onClick={() => setDemoCardOpen(true)}
-                className="px-8 py-3 bg-black border border-zinc-700 hover:bg-zinc-900 text-white font-bold rounded-xl tracking-wide transition-colors"
+                className="px-8 py-3 bg-foreground hover:opacity-90 text-background font-bold rounded-xl tracking-wide transition-opacity"
               >
                 Book a demo
               </button>
@@ -837,8 +837,7 @@ const Simulator = () => {
       {!turboOpen && (
         <button
           onClick={() => setTurboOpen(true)}
-          className="fixed bottom-6 right-6 z-30 flex items-center gap-2 px-5 py-3 rounded-full font-bold text-white text-sm bg-yellow-500 hover:bg-yellow-400 active:scale-95 transition-all shadow-2xl"
-          style={{ boxShadow: "0 4px 24px rgba(234,179,8,0.4)" }}
+          className="fixed bottom-6 right-6 z-30 flex items-center gap-2 px-5 py-3 rounded-full font-bold text-sm active:scale-95 transition-all text-white bg-yellow-500 hover:bg-yellow-400 shadow-[0_4px_24px_rgba(234,179,8,0.4)] dark:text-success-foreground dark:bg-success dark:hover:bg-success/90 dark:shadow-[0_4px_24px_rgba(34,197,94,0.35)]"
         >
           <Zap className="w-4 h-4" />
           Turbo

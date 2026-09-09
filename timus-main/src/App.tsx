@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import AuthModal from "@/components/AuthModal";
 import Index from "./pages/Index";
@@ -27,7 +28,10 @@ const GlobalAuthModal = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
+    {/* Toggles the `dark` class on <html>, persists to localStorage,
+        defaults to the OS prefers-color-scheme on first visit */}
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      <TooltipProvider>
       <AuthProvider>
         <Toaster />
         <Sonner />
@@ -43,7 +47,8 @@ const App = () => (
           </Routes>
         </BrowserRouter>
       </AuthProvider>
-    </TooltipProvider>
+      </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

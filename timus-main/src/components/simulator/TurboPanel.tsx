@@ -54,7 +54,7 @@ export default function TurboPanel({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg bg-zinc-950 border border-zinc-700 rounded-2xl overflow-y-auto"
+        className="w-full max-w-lg bg-card border border-border rounded-2xl overflow-y-auto"
         style={{
           maxHeight: "90vh",
           boxShadow: "0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06)",
@@ -62,17 +62,17 @@ export default function TurboPanel({
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header ───────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-zinc-800">
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border">
           <div className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-yellow-400" />
-            <span className="font-bold text-white text-lg">Turbo</span>
-            <span className="text-zinc-400 font-semibold">{ticker}</span>
+            <Zap className="w-5 h-5 text-yellow-500 dark:text-yellow-400" />
+            <span className="font-bold text-foreground text-lg">Turbo</span>
+            <span className="text-muted-foreground font-semibold">{ticker}</span>
           </div>
           <div className="flex items-center gap-4">
             {currentPrice > 0 && (
-              <span className="text-white font-bold text-lg">${currentPrice.toFixed(2)}</span>
+              <span className="text-foreground font-bold text-lg">${currentPrice.toFixed(2)}</span>
             )}
-            <button onClick={onClose} className="text-zinc-400 hover:text-white transition-colors">
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -81,10 +81,10 @@ export default function TurboPanel({
         <div className="px-5 py-4 space-y-4">
           {/* ── Quantity ──────────────────────────────────────────────── */}
           <div>
-            <div className="flex items-center justify-between bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2">
+            <div className="flex items-center justify-between bg-muted border border-border rounded-xl px-4 py-2">
               <button
                 onClick={() => setQty(clampQty(qty - 1))}
-                className="text-zinc-300 hover:text-white p-1 transition-colors"
+                className="text-muted-foreground hover:text-foreground p-1 transition-colors"
               >
                 <Minus className="w-5 h-5" />
               </button>
@@ -94,13 +94,13 @@ export default function TurboPanel({
                   value={qty}
                   min={1}
                   onChange={(e) => setQty(clampQty(parseFloat(e.target.value) || 1))}
-                  className="bg-transparent text-white text-xl font-bold text-center w-20 outline-none"
+                  className="bg-transparent text-foreground text-xl font-bold text-center w-20 outline-none"
                 />
-                <p className="text-zinc-500 text-xs">shares</p>
+                <p className="text-muted-foreground text-xs">shares</p>
               </div>
               <button
                 onClick={() => setQty(clampQty(qty + 1))}
-                className="text-zinc-300 hover:text-white p-1 transition-colors"
+                className="text-muted-foreground hover:text-foreground p-1 transition-colors"
               >
                 <Plus className="w-5 h-5" />
               </button>
@@ -114,8 +114,8 @@ export default function TurboPanel({
                   onClick={() => setQty(q)}
                   className={`py-1.5 rounded-lg text-sm font-bold transition-colors ${
                     qty === q
-                      ? "bg-zinc-600 text-white"
-                      : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/70"
                   }`}
                 >
                   {q}
@@ -129,14 +129,14 @@ export default function TurboPanel({
             <button
               onClick={() => fire("buy")}
               disabled={currentPrice <= 0}
-              className="py-5 rounded-xl font-bold text-white text-lg bg-green-600 hover:bg-green-500 active:scale-95 transition-all disabled:opacity-40"
+              className="py-5 rounded-xl font-bold text-success-foreground text-lg bg-success hover:bg-success/90 active:scale-95 transition-all disabled:opacity-40"
             >
               Buy
             </button>
             <button
               onClick={() => fire("sell")}
               disabled={currentPrice <= 0}
-              className="py-5 rounded-xl font-bold text-white text-lg bg-rose-600 hover:bg-rose-500 active:scale-95 transition-all disabled:opacity-40"
+              className="py-5 rounded-xl font-bold text-destructive-foreground text-lg bg-destructive hover:bg-destructive/90 active:scale-95 transition-all disabled:opacity-40"
             >
               Sell
             </button>
@@ -147,31 +147,31 @@ export default function TurboPanel({
             <button
               onClick={closeAll}
               disabled={held <= 0}
-              className="py-3 rounded-xl font-bold text-white text-sm bg-zinc-700 hover:bg-zinc-600 active:scale-95 transition-all disabled:opacity-30"
+              className="py-3 rounded-xl font-bold text-secondary-foreground text-sm bg-secondary hover:bg-secondary/80 active:scale-95 transition-all disabled:opacity-30"
             >
               {held > 0 ? `Close All (${held} shares)` : "No Position"}
             </button>
             <button
               onClick={onClose}
-              className="py-3 rounded-xl font-semibold text-zinc-300 text-sm bg-zinc-800 hover:bg-zinc-700 active:scale-95 transition-all"
+              className="py-3 rounded-xl font-semibold text-muted-foreground text-sm bg-muted hover:bg-muted/70 active:scale-95 transition-all"
             >
               Done
             </button>
           </div>
 
           {/* ── Position info ──────────────────────────────────────────── */}
-          <div className="flex items-center justify-between text-xs border-t border-zinc-800 pt-3 pb-1">
-            <span className="text-zinc-500">
-              Holding: <span className="text-white font-semibold">{held} shares</span>
-              {held > 0 && <span className="text-zinc-400"> @ ${avgEntry.toFixed(2)}</span>}
+          <div className="flex items-center justify-between text-xs border-t border-border pt-3 pb-1">
+            <span className="text-muted-foreground">
+              Holding: <span className="text-foreground font-semibold">{held} shares</span>
+              {held > 0 && <span className="text-muted-foreground"> @ ${avgEntry.toFixed(2)}</span>}
             </span>
             {held > 0 && (
-              <span className={`font-bold ${livePnL >= 0 ? "text-green-400" : "text-red-400"}`}>
+              <span className={`font-bold ${livePnL >= 0 ? "text-success" : "text-destructive"}`}>
                 {livePnL >= 0 ? "+" : ""}${livePnL.toFixed(2)}
               </span>
             )}
-            <span className="text-zinc-500">
-              Cash: <span className="text-white font-semibold">${balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+            <span className="text-muted-foreground">
+              Cash: <span className="text-foreground font-semibold">${balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
             </span>
           </div>
         </div>
