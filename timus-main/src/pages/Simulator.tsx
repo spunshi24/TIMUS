@@ -10,7 +10,7 @@ import CustomWatchlistPanel from "@/components/simulator/CustomWatchlistPanel";
 import GameRoomPanel from "@/components/simulator/GameRoomPanel";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, fetchQuotes } from "@/lib/api";
 import { mergeOrders } from "@/lib/mergeOrders";
 
 export interface Position {
@@ -557,19 +557,15 @@ const Simulator = () => {
       const working = workingOrdersRef.current;
       if (working.length === 0) return;
       const tickers = [...new Set(working.map((o) => o.ticker))];
-      const results = await Promise.allSettled(
-        tickers.map((t) =>
-          fetch(`${API_BASE}/api/quote/${t}`).then((r) => r.json())
-        )
-      );
-      results.forEach((result, i) => {
-        if (result.status !== "fulfilled") return;
-        const price = result.value?.price;
-        if (typeof price !== "number" || price <= 0) return;
-        pricesByTickerRef.current = { ...pricesByTickerRef.current, [tickers[i]]: price };
-        setPricesByTicker((prev) => ({ ...prev, [tickers[i]]: price }));
-        checkWorkingOrders(tickers[i], price);
-      });
+      // One batched request covers every ticker with a pending working order
+      const quotes = await fetchQuotes(tickers);
+      for (const ticker of tickers) {
+        const price = quotes[ticker]?.price;
+        if (typeof price !== "number" || price <= 0) continue;
+        pricesByTickerRef.current = { ...pricesByTickerRef.current, [ticker]: price };
+        setPricesByTicker((prev) => ({ ...prev, [ticker]: price }));
+        checkWorkingOrders(ticker, price);
+      }
     };
     checkAllWorkingOrders();
     const interval = setInterval(checkAllWorkingOrders, 15_000);

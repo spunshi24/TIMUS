@@ -132,7 +132,8 @@ const ChartPanel = ({ ticker, onPriceUpdate }: ChartPanelProps) => {
     periodRef.current = "1D";
 
     doFetch();
-    const interval = setInterval(doFetch, 30_000);
+    // 15s matches the server-side quote cache TTL so polls see fresh prices
+    const interval = setInterval(doFetch, 15_000);
     return () => { controller.abort(); clearInterval(interval); };
   }, [ticker]);
 

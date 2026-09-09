@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { mergeOrders } from "@/lib/mergeOrders";
 import PositionsPanel from "@/components/simulator/PositionsPanel";
 import type { Position, Order } from "./Simulator";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, fetchQuotes } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 interface QuoteSummary {
@@ -114,17 +114,14 @@ const Portfolio = () => {
     const aggregated = aggregatePositions(positions);
     const tickers = Array.from(aggregated.keys());
 
-    // Fetch live quotes for every held ticker in parallel
-    const quoteResults = await Promise.allSettled(
-      tickers.map((t) => fetch(`${API_BASE}/api/quote/${t}`).then((r) => r.json() as Promise<QuoteSummary>))
-    );
+    // Fetch live quotes for every held ticker in one batched call
+    const quotes = await fetchQuotes(tickers);
 
     const rows: HoldingRow[] = [];
-    tickers.forEach((ticker, i) => {
+    tickers.forEach((ticker) => {
       const agg = aggregated.get(ticker)!;
-      const result = quoteResults[i];
-      const quote: Partial<QuoteSummary> =
-        result.status === "fulfilled" ? result.value : {};
+      // Quote fields may be null from the API; every use below falls back via ??
+      const quote = (quotes[ticker] ?? {}) as Partial<QuoteSummary>;
 
       const currentPrice = quote.price ?? agg.avgCost;
       const marketValue = currentPrice * agg.shares;

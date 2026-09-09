@@ -32,7 +32,7 @@ app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False  # tokens don't expire
 jwt = JWTManager(app)
 
 # ─── Cache ───────────────────────────────────────────────────────────────────
-QUOTE_CACHE_DURATION   = 30    # seconds — live prices
+QUOTE_CACHE_DURATION   = 15    # seconds — live prices (matches the chart's poll rate)
 HISTORY_CACHE_DURATION = 60    # seconds — chart OHLCV data
 INFO_CACHE_DURATION    = 3600  # 1 hour  — company metadata
 CACHE_MAX_SIZE         = 500   # entries before LRU eviction
@@ -498,6 +498,70 @@ def safe_float(value, digits=2):
         return None
 
 
+def _format_quote(ticker, stock):
+    """
+    Extract and format quote fields from a yf.Ticker object.
+    Shared by /api/quote/<ticker> and /api/quotes so the two never drift.
+    Returns the result dict, or None when the ticker is invalid / has no price.
+    """
+    info = stock.info
+
+    # Yahoo Finance returns an empty/minimal dict for invalid tickers
+    if not info or info.get("quoteType") is None:
+        return None
+
+    # Current price: try several field names Yahoo uses depending on market hours
+    current_price = (
+        info.get("currentPrice")
+        or info.get("regularMarketPrice")
+        or info.get("ask")
+        or info.get("navPrice")
+    )
+
+    # If still None (pre/after-hours or ETF), fall back to recent history
+    if current_price is None:
+        hist = stock.history(period="5d", interval="1d")
+        if not hist.empty:
+            current_price = float(hist["Close"].iloc[-1])
+        else:
+            return None
+
+    prev_close = (
+        info.get("previousClose")
+        or info.get("regularMarketPreviousClose")
+        or current_price
+    )
+
+    change = float(current_price) - float(prev_close)
+    change_pct = (change / float(prev_close) * 100) if prev_close else 0
+
+    # yfinance returns dividendYield as a decimal fraction (0.0046 = 0.46%).
+    # Multiply by 100 to get percentage. Cap at 25% to filter data errors.
+    raw_yield = info.get("dividendYield") or 0
+    div_yield_pct = round(float(raw_yield) * 100, 2)
+    if div_yield_pct > 25:
+        div_yield_pct = None  # almost certainly a data error
+
+    return {
+        "ticker": ticker,
+        "name": info.get("longName") or info.get("shortName") or TICKER_INDEX.get(ticker, ticker),
+        "price": safe_float(current_price),
+        "change": safe_float(change),
+        "change_pct": safe_float(change_pct, 4),
+        "volume": info.get("volume") or info.get("regularMarketVolume") or 0,
+        "open": safe_float(info.get("open") or info.get("regularMarketOpen") or current_price),
+        "high": safe_float(info.get("dayHigh") or info.get("regularMarketDayHigh") or current_price),
+        "low": safe_float(info.get("dayLow") or info.get("regularMarketDayLow") or current_price),
+        "prev_close": safe_float(prev_close),
+        "market_cap": format_market_cap(info.get("marketCap")),
+        "pe_ratio": safe_float(info.get("trailingPE")),
+        "beta": safe_float(info.get("beta")),
+        "week52_high": safe_float(info.get("fiftyTwoWeekHigh")),
+        "week52_low": safe_float(info.get("fiftyTwoWeekLow")),
+        "dividend_yield": div_yield_pct,
+    }
+
+
 @app.route("/api/quote/<ticker>")
 def get_quote(ticker):
     """
@@ -514,68 +578,68 @@ def get_quote(ticker):
         return jsonify(cached)
 
     try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
-
-        # Yahoo Finance returns an empty/minimal dict for invalid tickers
-        if not info or info.get("quoteType") is None:
-            return jsonify({"error": f"Ticker '{ticker}' not found or invalid."}), 404
-
-        # Current price: try several field names Yahoo uses depending on market hours
-        current_price = (
-            info.get("currentPrice")
-            or info.get("regularMarketPrice")
-            or info.get("ask")
-            or info.get("navPrice")
-        )
-
-        # If still None (pre/after-hours or ETF), fall back to recent history
-        if current_price is None:
-            hist = stock.history(period="5d", interval="1d")
-            if not hist.empty:
-                current_price = float(hist["Close"].iloc[-1])
-            else:
-                return jsonify({"error": f"No price data available for '{ticker}'."}), 404
-
-        prev_close = (
-            info.get("previousClose")
-            or info.get("regularMarketPreviousClose")
-            or current_price
-        )
-
-        change = float(current_price) - float(prev_close)
-        change_pct = (change / float(prev_close) * 100) if prev_close else 0
-
-        # yfinance returns dividendYield as a decimal fraction (0.0046 = 0.46%).
-        # Multiply by 100 to get percentage. Cap at 25% to filter data errors.
-        raw_yield = info.get("dividendYield") or 0
-        div_yield_pct = round(float(raw_yield) * 100, 2)
-        if div_yield_pct > 25:
-            div_yield_pct = None  # almost certainly a data error
-
-        result = {
-            "ticker": ticker,
-            "name": info.get("longName") or info.get("shortName") or TICKER_INDEX.get(ticker, ticker),
-            "price": safe_float(current_price),
-            "change": safe_float(change),
-            "change_pct": safe_float(change_pct, 4),
-            "volume": info.get("volume") or info.get("regularMarketVolume") or 0,
-            "open": safe_float(info.get("open") or info.get("regularMarketOpen") or current_price),
-            "high": safe_float(info.get("dayHigh") or info.get("regularMarketDayHigh") or current_price),
-            "low": safe_float(info.get("dayLow") or info.get("regularMarketDayLow") or current_price),
-            "prev_close": safe_float(prev_close),
-            "market_cap": format_market_cap(info.get("marketCap")),
-            "pe_ratio": safe_float(info.get("trailingPE")),
-            "beta": safe_float(info.get("beta")),
-            "week52_high": safe_float(info.get("fiftyTwoWeekHigh")),
-            "week52_low": safe_float(info.get("fiftyTwoWeekLow")),
-            "dividend_yield": div_yield_pct,
-        }
+        result = _format_quote(ticker, yf.Ticker(ticker))
+        if result is None:
+            return jsonify({"error": f"Ticker '{ticker}' not found or has no price data."}), 404
         cache_set(cache_key, result, QUOTE_CACHE_DURATION)
         return jsonify(result)
     except Exception as e:
         logger.error("get_quote %s: %s", ticker, e)
         return jsonify({"error": str(e)}), 500
+
+
+MAX_BATCH_TICKERS = 60
+
+
+@app.route("/api/quotes")
+def get_quotes():
+    """
+    Batched quotes: GET /api/quotes?tickers=AAPL,MSFT,NVDA
+    Returns {"AAPL": {...same shape as /api/quote...}, ...}.
+    Tickers that fail are omitted rather than failing the whole batch.
+    """
+    raw = request.args.get("tickers", "")
+    tickers = [t.upper().strip() for t in raw.split(",") if t.strip()]
+    tickers = list(dict.fromkeys(tickers))  # dedupe, preserve order
+
+    if not tickers:
+        return jsonify({"error": "No tickers provided."}), 400
+    if len(tickers) > MAX_BATCH_TICKERS:
+        return jsonify({"error": f"Too many tickers (max {MAX_BATCH_TICKERS} per request)."}), 400
+    invalid = [t for t in tickers if not validate_ticker(t)]
+    if invalid:
+        return jsonify({"error": f"Invalid ticker symbol(s): {', '.join(invalid)}."}), 400
+
+    out = {}
+    missing = []
+    for t in tickers:
+        cached = cache_get(f"quote:{t}")
+        if cached is not None:
+            out[t] = cached
+        else:
+            missing.append(t)
+
+    if missing:
+        try:
+            # yf.Tickers fetches the miss set in fewer HTTP round-trips than
+            # N separate yf.Ticker(...) lookups.
+            batch = yf.Tickers(" ".join(missing))
+            for t in missing:
+                try:
+                    stock = batch.tickers.get(t)
+                    if stock is None:
+                        continue
+                    result = _format_quote(t, stock)
+                    if result is not None:
+                        cache_set(f"quote:{t}", result, QUOTE_CACHE_DURATION)
+                        out[t] = result
+                except Exception as e:
+                    # One bad symbol must never 500 the whole batch
+                    logger.warning("get_quotes %s: %s", t, e)
+        except Exception as e:
+            logger.error("get_quotes batch fetch: %s", e)
+
+    return jsonify(out)
 
 
 @app.route("/api/history/<ticker>")
