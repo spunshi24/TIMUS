@@ -5,6 +5,7 @@ import { TrendingUp, TrendingDown, RefreshCw, BarChart2, Info } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { mergeOrders } from "@/lib/mergeOrders";
+import { aggregatePositions } from "@/lib/portfolio";
 import PositionsPanel from "@/components/simulator/PositionsPanel";
 import type { Position, Order } from "./Simulator";
 import { API_BASE, fetchQuotes } from "@/lib/api";
@@ -54,23 +55,6 @@ function loadBalance(): { balance: number; initialBalance: number } {
     catch { return 100000; }
   })();
   return { balance, initialBalance };
-}
-
-// Merge duplicate positions for the same ticker into one row (avg cost)
-function aggregatePositions(positions: Position[]): Map<string, { shares: number; avgCost: number }> {
-  const map = new Map<string, { totalCost: number; shares: number }>();
-  for (const p of positions) {
-    const existing = map.get(p.ticker) ?? { totalCost: 0, shares: 0 };
-    map.set(p.ticker, {
-      totalCost: existing.totalCost + p.entryPrice * p.quantity,
-      shares: existing.shares + p.quantity,
-    });
-  }
-  const result = new Map<string, { shares: number; avgCost: number }>();
-  for (const [ticker, { totalCost, shares }] of map) {
-    result.set(ticker, { shares, avgCost: shares > 0 ? totalCost / shares : 0 });
-  }
-  return result;
 }
 
 const Portfolio = () => {

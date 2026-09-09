@@ -114,6 +114,16 @@ const GameRoomPanel = ({ user, token, onAuthClick }: GameRoomPanelProps) => {
   const [confirmCode, setConfirmCode] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
   const [createLoading, setCreateLoading] = useState(false);
+  // Inline code-field error (length / code-in-use) with a brief shake — the
+  // generic red banner stays reserved for network/unexpected errors (D2)
+  const [codeFieldError, setCodeFieldError] = useState<string | null>(null);
+  const [codeShake, setCodeShake] = useState(false);
+
+  const flagCodeField = (msg: string) => {
+    setCodeFieldError(msg);
+    setCodeShake(true);
+    setTimeout(() => setCodeShake(false), 400);
+  };
 
   // Join flow
   const [joinCode, setJoinCode] = useState("");
@@ -176,6 +186,7 @@ const GameRoomPanel = ({ user, token, onAuthClick }: GameRoomPanelProps) => {
     setCreateCode("");
     setConfirmCode("");
     setCreateError(null);
+    setCodeFieldError(null);
     setView("create");
   };
 
@@ -187,8 +198,9 @@ const GameRoomPanel = ({ user, token, onAuthClick }: GameRoomPanelProps) => {
 
   const handleCreate = async () => {
     setCreateError(null);
+    setCodeFieldError(null);
     if (createCode.length !== 8) {
-      setCreateError("Code must be exactly 8 characters.");
+      flagCodeField("Must be exactly 8 characters");
       return;
     }
     if (createCode !== confirmCode) {
@@ -206,7 +218,9 @@ const GameRoomPanel = ({ user, token, onAuthClick }: GameRoomPanelProps) => {
         body: JSON.stringify({ code: createCode }),
       });
       const data = await res.json();
-      if (!res.ok) {
+      if (res.status === 409) {
+        flagCodeField("Code in use");
+      } else if (!res.ok) {
         setCreateError(data.error || "Failed to create game room.");
       } else {
         setActiveRoom(data.code);
@@ -377,11 +391,16 @@ const GameRoomPanel = ({ user, token, onAuthClick }: GameRoomPanelProps) => {
             <input
               type="text"
               value={createCode}
-              onChange={(e) => setCreateCode(sanitizeCode(e.target.value))}
+              onChange={(e) => { setCreateCode(sanitizeCode(e.target.value)); setCodeFieldError(null); }}
               placeholder="e.g. TRADE123"
               maxLength={8}
-              className="w-full px-3 py-2 rounded-lg border-2 border-border bg-background text-foreground font-mono text-lg tracking-widest placeholder:text-muted-foreground/50 placeholder:font-sans placeholder:text-sm placeholder:tracking-normal focus:outline-none focus:border-foreground/40 transition-colors"
+              className={`w-full px-3 py-2 rounded-lg border-2 bg-background text-foreground font-mono text-lg tracking-widest placeholder:text-muted-foreground/50 placeholder:font-sans placeholder:text-sm placeholder:tracking-normal focus:outline-none transition-colors ${
+                codeShake ? "animate-shake" : ""
+              } ${codeFieldError ? "border-destructive focus:border-destructive" : "border-border focus:border-foreground/40"}`}
             />
+            {codeFieldError && (
+              <p className="text-xs text-destructive font-semibold">{codeFieldError}</p>
+            )}
             <p className="text-xs text-muted-foreground leading-relaxed">
               Your code must be exactly 8 characters. Letters and numbers only. All letters will be automatically converted to uppercase.
             </p>

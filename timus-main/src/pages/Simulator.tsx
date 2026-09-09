@@ -8,7 +8,7 @@ import OrderPanel from "@/components/simulator/OrderPanel";
 import TurboPanel from "@/components/simulator/TurboPanel";
 import WatchlistPanel from "@/components/simulator/WatchlistPanel";
 import CustomWatchlistPanel from "@/components/simulator/CustomWatchlistPanel";
-import GameRoomPanel from "@/components/simulator/GameRoomPanel";
+import StockPositionsPanel from "@/components/simulator/StockPositionsPanel";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { API_BASE, fetchQuotes } from "@/lib/api";
@@ -688,21 +688,29 @@ const Simulator = () => {
 
         <div className="container mx-auto px-4 py-8 space-y-6">
           {selectedTicker ? (
-            <div className="grid lg:grid-cols-3 gap-6">
-              {/* Chart */}
-              <div className="lg:col-span-2">
-                <ChartPanel ticker={selectedTicker} onPriceUpdate={handlePriceUpdate} />
+            <div className="space-y-6">
+              <div className="grid lg:grid-cols-3 gap-6">
+                {/* Chart */}
+                <div className="lg:col-span-2">
+                  <ChartPanel ticker={selectedTicker} onPriceUpdate={handlePriceUpdate} />
+                </div>
+
+                {/* Order Panel */}
+                <div className="lg:col-span-1">
+                  <OrderPanel
+                    ticker={selectedTicker}
+                    balance={balance}
+                    currentPrice={currentPrice}
+                    onPlaceOrder={handlePlaceOrder}
+                  />
+                </div>
               </div>
 
-              {/* Order Panel */}
-              <div className="lg:col-span-1">
-                <OrderPanel
-                  ticker={selectedTicker}
-                  balance={balance}
-                  currentPrice={currentPrice}
-                  onPlaceOrder={handlePlaceOrder}
-                />
-              </div>
+              {/* All positions across every ticker — hidden when none are held */}
+              <StockPositionsPanel
+                positions={positions}
+                onSelectTicker={handleTickerChange}
+              />
             </div>
           ) : (
             <div className="space-y-6">
@@ -731,13 +739,6 @@ const Simulator = () => {
               </button>
             </div>
           )}
-
-          {/* Game Room — always visible */}
-          <GameRoomPanel
-            user={user}
-            token={token}
-            onAuthClick={openAuthModal}
-          />
         </div>
       </div>
 
