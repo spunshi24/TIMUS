@@ -198,7 +198,7 @@ const Portfolio = () => {
   const pnlSign = (n: number) => (n >= 0 ? "+" : "-");
 
   return (
-    <AppShell>
+    <AppShell title="Portfolio">
       <div>
         <div className="container mx-auto px-4 py-10">
 

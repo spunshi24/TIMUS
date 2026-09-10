@@ -16,7 +16,7 @@ const Watchlist = () => {
   };
 
   return (
-    <AppShell>
+    <AppShell title="Watchlist">
       <div className="container mx-auto px-4 py-10 max-w-4xl">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-foreground">Watchlist</h1>

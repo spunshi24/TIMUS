@@ -21,9 +21,9 @@ export default {
           dark: '#ece4d2',
           deep: '#e4dac3',
         },
-        ink: '#1a1613',
-        dim: '#6b5f4e',
-        ered: '#b8321e',
+        ink: "hsl(var(--ink))",
+        dim: "hsl(var(--dim))",
+        ered: "hsl(var(--ered))",
         eteal: '#2f6b5d',
         // Existing tokens
         border: "hsl(var(--border))",

@@ -1,11 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, Edit2, UserCircle2, PanelLeft, PanelLeftClose } from "lucide-react";
+import { Search, Edit2, UserCircle2 } from "lucide-react";
 import { API_BASE } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/context/AuthContext";
-import { useSidebar } from "@/context/SidebarContext";
 
 interface TickerResult {
   ticker: string;
@@ -34,7 +32,6 @@ const SimulatorHeader = ({
   onShowWatchlist,
 }: SimulatorHeaderProps) => {
   const { user } = useAuth();
-  const { sidebarOpen, toggleSidebar } = useSidebar();
   const [isEditingBalance, setIsEditingBalance] = useState(false);
   const [tempBalance, setTempBalance] = useState(balance.toString());
 
@@ -136,21 +133,6 @@ const SimulatorHeader = ({
 
           {/* ── Ticker search with autocomplete ─────────────────────────── */}
           <div className="flex items-center gap-3 flex-1" ref={containerRef}>
-            {user && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={toggleSidebar}
-                    className="hidden md:flex shrink-0 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  >
-                    {sidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeft className="w-5 h-5" />}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{sidebarOpen ? "Hide sidebar" : "Show sidebar"}</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
             {selectedTicker && (
               <button
                 onClick={onShowWatchlist}

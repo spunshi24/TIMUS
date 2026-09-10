@@ -34,7 +34,7 @@ const Gameroom = () => {
   const { user, token, openAuthModal } = useAuth();
 
   return (
-    <AppShell>
+    <AppShell title="Game Room">
       <div className="container mx-auto px-4 py-12 space-y-14 max-w-5xl">
 
         {/* ── Explainer ─────────────────────────────────────────────────── */}

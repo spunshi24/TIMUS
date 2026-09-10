@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Menu, X, LogOut, UserCircle2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useSidebar } from "@/context/SidebarContext";
 import SettingsMenu from "@/components/shell/SettingsMenu";
 import FullscreenButton from "@/components/shell/FullscreenButton";
 import ProfileMenu from "@/components/shell/ProfileMenu";
@@ -10,7 +9,6 @@ import ProfileMenu from "@/components/shell/ProfileMenu";
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { user, logout, openAuthModal } = useAuth();
-  const { sidebarOpen } = useSidebar();
   const navigate = useNavigate();
 
   const scrollTo = (id: string) => {
@@ -59,28 +57,26 @@ const Navigation = () => {
         </div>
 
         {/* Right side: logged out → Sign In; logged in → icon cluster,
-            hidden entirely while the sidebar is open (its controls move there) */}
+            always visible regardless of sidebar state (F2) */}
         <div className="flex items-center gap-1 text-sm font-medium">
           {user ? (
-            !sidebarOpen && (
-              <>
-                <SettingsMenu />
-                <FullscreenButton />
-                <ProfileMenu
-                  direction="down"
-                  align="end"
-                  showLogout
-                  trigger={
-                    <button
-                      className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                      title={user.username}
-                    >
-                      <UserCircle2 className="w-5 h-5" />
-                    </button>
-                  }
-                />
-              </>
-            )
+            <>
+              <SettingsMenu />
+              <FullscreenButton />
+              <ProfileMenu
+                direction="down"
+                align="end"
+                showLogout
+                trigger={
+                  <button
+                    className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    title={user.username}
+                  >
+                    <UserCircle2 className="w-5 h-5" />
+                  </button>
+                }
+              />
+            </>
           ) : (
             <button
               onClick={openAuthModal}
@@ -136,13 +132,31 @@ const Navigation = () => {
           >
             News
           </Link>
+          <Link
+            to="/watchlist"
+            onClick={() => setIsOpen(false)}
+            className="block text-sm font-medium text-foreground py-2.5 border-b border-border/50"
+          >
+            Watchlist
+          </Link>
+          <Link
+            to="/gameroom"
+            onClick={() => setIsOpen(false)}
+            className="block text-sm font-medium text-foreground py-2.5 border-b border-border/50"
+          >
+            Game Room
+          </Link>
           {user ? (
-            <button
-              onClick={() => { logout(); setIsOpen(false); }}
-              className="flex items-center gap-2 text-sm font-medium text-muted-foreground py-2.5"
-            >
-              <LogOut className="w-3.5 h-3.5" /> Logout
-            </button>
+            <div className="flex items-center justify-between py-1">
+              <button
+                onClick={() => { logout(); setIsOpen(false); }}
+                className="flex items-center gap-2 text-sm font-medium text-muted-foreground py-1.5"
+              >
+                <LogOut className="w-3.5 h-3.5" /> Logout
+              </button>
+              {/* Theme toggle + Help, reachable on mobile (F5) */}
+              <SettingsMenu />
+            </div>
           ) : (
             <button
               onClick={() => { setIsOpen(false); openAuthModal(); }}
