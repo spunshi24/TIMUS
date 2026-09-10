@@ -1,11 +1,16 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Menu, X, LogOut } from "lucide-react";
+import { Menu, X, LogOut, UserCircle2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useSidebar } from "@/context/SidebarContext";
+import SettingsMenu from "@/components/shell/SettingsMenu";
+import FullscreenButton from "@/components/shell/FullscreenButton";
+import ProfileMenu from "@/components/shell/ProfileMenu";
 
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout, openAuthModal } = useAuth();
+  const { sidebarOpen } = useSidebar();
   const navigate = useNavigate();
 
   const scrollTo = (id: string) => {
@@ -28,6 +33,7 @@ const Navigation = () => {
           TiMUS
         </Link>
 
+        {/* Persistent top row — always visible regardless of sidebar state */}
         <div className="flex items-center gap-7 text-sm font-medium text-muted-foreground">
           <Link to="/simulator" className="hover:text-foreground transition-colors">
             Simulator
@@ -38,30 +44,50 @@ const Navigation = () => {
           >
             For Educators
           </button>
+          <button
+            onClick={() => scrollTo("education")}
+            className="hover:text-foreground transition-colors"
+          >
+            Learning
+          </button>
           <Link to="/portfolio" className="hover:text-foreground transition-colors">
             Portfolio
           </Link>
+          <Link to="/news" className="hover:text-foreground transition-colors">
+            News
+          </Link>
         </div>
 
-        <div className="flex items-center gap-4 text-sm font-medium">
+        {/* Right side: logged out → Sign In; logged in → icon cluster,
+            hidden entirely while the sidebar is open (its controls move there) */}
+        <div className="flex items-center gap-1 text-sm font-medium">
           {user ? (
-            <>
-              <span className="text-muted-foreground">{user.username}</span>
-              <button
-                onClick={logout}
-                className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                Logout
-              </button>
-            </>
+            !sidebarOpen && (
+              <>
+                <SettingsMenu />
+                <FullscreenButton />
+                <ProfileMenu
+                  direction="down"
+                  align="end"
+                  showLogout
+                  trigger={
+                    <button
+                      className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      title={user.username}
+                    >
+                      <UserCircle2 className="w-5 h-5" />
+                    </button>
+                  }
+                />
+              </>
+            )
           ) : (
-            <Link
-              to="/simulator"
+            <button
+              onClick={openAuthModal}
               className="px-4 py-2 rounded-md bg-foreground text-background text-sm font-semibold hover:opacity-90 transition-opacity"
             >
               Sign In
-            </Link>
+            </button>
           )}
         </div>
       </div>
@@ -90,12 +116,25 @@ const Navigation = () => {
           >
             For Educators
           </button>
+          <button
+            onClick={() => scrollTo("education")}
+            className="block w-full text-left text-sm font-medium text-foreground py-2.5 border-b border-border/50"
+          >
+            Learning
+          </button>
           <Link
             to="/portfolio"
             onClick={() => setIsOpen(false)}
             className="block text-sm font-medium text-foreground py-2.5 border-b border-border/50"
           >
             Portfolio
+          </Link>
+          <Link
+            to="/news"
+            onClick={() => setIsOpen(false)}
+            className="block text-sm font-medium text-foreground py-2.5 border-b border-border/50"
+          >
+            News
           </Link>
           {user ? (
             <button
@@ -105,13 +144,12 @@ const Navigation = () => {
               <LogOut className="w-3.5 h-3.5" /> Logout
             </button>
           ) : (
-            <Link
-              to="/simulator"
-              onClick={() => setIsOpen(false)}
-              className="block text-sm font-semibold text-foreground py-2.5"
+            <button
+              onClick={() => { setIsOpen(false); openAuthModal(); }}
+              className="block w-full text-left text-sm font-semibold text-foreground py-2.5"
             >
               Sign In →
-            </Link>
+            </button>
           )}
         </div>
       )}

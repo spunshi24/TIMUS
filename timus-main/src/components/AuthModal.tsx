@@ -63,19 +63,19 @@ export default function AuthModal({ open, onClose, onSuccess }: AuthModalProps) 
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm bg-zinc-950 border border-zinc-700 rounded-2xl overflow-hidden"
+        className="w-full max-w-sm bg-card border border-border rounded-2xl overflow-hidden"
         style={{
           boxShadow: "0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-zinc-800">
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-border">
           <div>
-            <h2 className="text-white font-bold text-lg">
+            <h2 className="text-foreground font-bold text-lg">
               {tab === "signup" ? "Create Account" : "Welcome Back"}
             </h2>
-            <p className="text-zinc-400 text-xs mt-0.5">
+            <p className="text-muted-foreground text-xs mt-0.5">
               {tab === "signup"
                 ? "Save your portfolio and trade without limits"
                 : "Log in to access your saved portfolio"}
@@ -83,14 +83,14 @@ export default function AuthModal({ open, onClose, onSuccess }: AuthModalProps) 
           </div>
           <button
             onClick={onClose}
-            className="text-zinc-500 hover:text-white transition-colors ml-4 shrink-0"
+            className="text-muted-foreground hover:text-foreground transition-colors ml-4 shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab switcher */}
-        <div className="flex mx-5 mt-4 bg-zinc-900 rounded-xl p-1">
+        <div className="flex mx-5 mt-4 bg-muted rounded-xl p-1">
           {(["signup", "login"] as Tab[]).map((t) => (
             <button
               key={t}
@@ -98,8 +98,8 @@ export default function AuthModal({ open, onClose, onSuccess }: AuthModalProps) 
               onClick={() => switchTab(t)}
               className={`flex-1 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
                 tab === t
-                  ? "bg-zinc-700 text-white"
-                  : "text-zinc-400 hover:text-zinc-200"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {t === "signup" ? "Sign Up" : "Log In"}
@@ -111,7 +111,7 @@ export default function AuthModal({ open, onClose, onSuccess }: AuthModalProps) 
         <form onSubmit={handleSubmit} className="px-5 pt-4 pb-5 space-y-3">
           {tab === "signup" && (
             <div className="space-y-1.5">
-              <Label htmlFor="auth-username" className="text-zinc-300 text-xs">
+              <Label htmlFor="auth-username" className="text-muted-foreground text-xs">
                 Username
               </Label>
               <Input
@@ -123,13 +123,13 @@ export default function AuthModal({ open, onClose, onSuccess }: AuthModalProps) 
                 onChange={(e) => setUsername(e.target.value)}
                 required
                 disabled={loading}
-                className="bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-600 focus-visible:ring-zinc-500"
+                className="bg-muted border-border text-foreground placeholder:text-muted-foreground/60 focus-visible:ring-ring"
               />
             </div>
           )}
 
           <div className="space-y-1.5">
-            <Label htmlFor="auth-email" className="text-zinc-300 text-xs">
+            <Label htmlFor="auth-email" className="text-muted-foreground text-xs">
               Email
             </Label>
             <Input
@@ -141,12 +141,12 @@ export default function AuthModal({ open, onClose, onSuccess }: AuthModalProps) 
               onChange={(e) => setEmail(e.target.value)}
               required
               disabled={loading}
-              className="bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-600 focus-visible:ring-zinc-500"
+              className="bg-muted border-border text-foreground placeholder:text-muted-foreground/60 focus-visible:ring-ring"
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="auth-password" className="text-zinc-300 text-xs">
+            <Label htmlFor="auth-password" className="text-muted-foreground text-xs">
               Password
             </Label>
             <Input
@@ -159,12 +159,12 @@ export default function AuthModal({ open, onClose, onSuccess }: AuthModalProps) 
               required
               minLength={6}
               disabled={loading}
-              className="bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-600 focus-visible:ring-zinc-500"
+              className="bg-muted border-border text-foreground placeholder:text-muted-foreground/60 focus-visible:ring-ring"
             />
           </div>
 
           {error && (
-            <p className="text-red-400 text-xs bg-red-950/30 border border-red-800/40 rounded-lg px-3 py-2">
+            <p className="text-destructive text-xs bg-destructive/10 border border-destructive/30 rounded-lg px-3 py-2">
               {error}
             </p>
           )}
@@ -179,12 +179,12 @@ export default function AuthModal({ open, onClose, onSuccess }: AuthModalProps) 
               : tab === "signup" ? "Create Account" : "Log In"}
           </Button>
 
-          <p className="text-center text-zinc-500 text-xs pt-1">
+          <p className="text-center text-muted-foreground text-xs pt-1">
             {tab === "signup" ? "Already have an account? " : "Don't have an account? "}
             <button
               type="button"
               onClick={() => switchTab(tab === "signup" ? "login" : "signup")}
-              className="text-zinc-300 hover:text-white underline underline-offset-2"
+              className="text-foreground/80 hover:text-foreground underline underline-offset-2"
             >
               {tab === "signup" ? "Log In" : "Sign Up"}
             </button>

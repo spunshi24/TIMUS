@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import type { Position } from "@/pages/Simulator";
@@ -51,12 +52,21 @@ const PositionsPanel = ({ positions, onClosePosition }: PositionsPanelProps) => 
               >
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <h4 className="text-xl font-bold text-foreground">
-                      {position.ticker}
-                    </h4>
-                    <p className="text-sm text-muted-foreground">
-                      {position.quantity} shares @ ${position.entryPrice.toFixed(2)}
-                    </p>
+                    <Link
+                      to="/simulator"
+                      className="block hover:opacity-80 transition-opacity"
+                      onClick={() => {
+                        // Pre-select this ticker in simulator via sessionStorage hint
+                        sessionStorage.setItem("timus_goto_ticker", position.ticker);
+                      }}
+                    >
+                      <h4 className="text-xl font-bold text-foreground">
+                        {position.ticker}
+                      </h4>
+                      <p className="text-sm text-muted-foreground">
+                        {position.quantity} shares @ ${position.entryPrice.toFixed(2)}
+                      </p>
+                    </Link>
                   </div>
                   {onClosePosition && (
                     <Button

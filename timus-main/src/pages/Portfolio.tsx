@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import Navigation from "@/components/Navigation";
-import { TrendingUp, TrendingDown, RefreshCw, BarChart2 } from "lucide-react";
+import AppShell from "@/components/shell/AppShell";
+import { TrendingUp, TrendingDown, RefreshCw, BarChart2, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { mergeOrders } from "@/lib/mergeOrders";
+import { aggregatePositions } from "@/lib/portfolio";
 import PositionsPanel from "@/components/simulator/PositionsPanel";
 import type { Position, Order } from "./Simulator";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, fetchQuotes } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 interface QuoteSummary {
@@ -54,23 +57,6 @@ function loadBalance(): { balance: number; initialBalance: number } {
   return { balance, initialBalance };
 }
 
-// Merge duplicate positions for the same ticker into one row (avg cost)
-function aggregatePositions(positions: Position[]): Map<string, { shares: number; avgCost: number }> {
-  const map = new Map<string, { totalCost: number; shares: number }>();
-  for (const p of positions) {
-    const existing = map.get(p.ticker) ?? { totalCost: 0, shares: 0 };
-    map.set(p.ticker, {
-      totalCost: existing.totalCost + p.entryPrice * p.quantity,
-      shares: existing.shares + p.quantity,
-    });
-  }
-  const result = new Map<string, { shares: number; avgCost: number }>();
-  for (const [ticker, { totalCost, shares }] of map) {
-    result.set(ticker, { shares, avgCost: shares > 0 ? totalCost / shares : 0 });
-  }
-  return result;
-}
-
 const Portfolio = () => {
   const { user, token } = useAuth();
   const [holdings, setHoldings] = useState<HoldingRow[]>([]);
@@ -112,17 +98,14 @@ const Portfolio = () => {
     const aggregated = aggregatePositions(positions);
     const tickers = Array.from(aggregated.keys());
 
-    // Fetch live quotes for every held ticker in parallel
-    const quoteResults = await Promise.allSettled(
-      tickers.map((t) => fetch(`${API_BASE}/api/quote/${t}`).then((r) => r.json() as Promise<QuoteSummary>))
-    );
+    // Fetch live quotes for every held ticker in one batched call
+    const quotes = await fetchQuotes(tickers);
 
     const rows: HoldingRow[] = [];
-    tickers.forEach((ticker, i) => {
+    tickers.forEach((ticker) => {
       const agg = aggregated.get(ticker)!;
-      const result = quoteResults[i];
-      const quote: Partial<QuoteSummary> =
-        result.status === "fulfilled" ? result.value : {};
+      // Quote fields may be null from the API; every use below falls back via ??
+      const quote = (quotes[ticker] ?? {}) as Partial<QuoteSummary>;
 
       const currentPrice = quote.price ?? agg.avgCost;
       const marketValue = currentPrice * agg.shares;
@@ -182,10 +165,7 @@ const Portfolio = () => {
               // Merge orders: combine local + backend by ID so we never lose recent trades
               const localOrders: Record<string, unknown>[] = JSON.parse(localStorage.getItem("timus_orders") || "[]");
               const backendOrders: Record<string, unknown>[] = Array.isArray(data.orders) ? data.orders : [];
-              const byId = new Map<string, Record<string, unknown>>();
-              for (const o of backendOrders) byId.set(o.id as string, o);
-              for (const o of localOrders) byId.set(o.id as string, o); // local wins on conflict
-              localStorage.setItem("timus_orders", JSON.stringify([...byId.values()]));
+              localStorage.setItem("timus_orders", JSON.stringify(mergeOrders(backendOrders, localOrders)));
             }
           }
         } catch {
@@ -218,9 +198,8 @@ const Portfolio = () => {
   const pnlSign = (n: number) => (n >= 0 ? "+" : "-");
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation />
-      <div className="pt-16">
+    <AppShell>
+      <div>
         <div className="container mx-auto px-4 py-10">
 
           {/* ── Page header ──────────────────────────────────────────────── */}
@@ -257,31 +236,49 @@ const Portfolio = () => {
                 value: `$${fmt(portfolioValue)}`,
                 sub: null,
                 color: "",
+                tooltip: null,
               },
               {
                 label: "Total P&L",
                 value: `${pnlSign(totalPnL)}$${fmt(Math.abs(totalPnL))}`,
                 sub: `${pnlSign(totalPnLPct)}${fmt(Math.abs(totalPnLPct))}%`,
                 color: pnlColor(totalPnL),
+                tooltip:
+                  "Includes realized P&L from closed trades plus unrealized P&L on current holdings.",
               },
               {
                 label: "Day P&L",
                 value: `${pnlSign(totalDayPnL)}$${fmt(Math.abs(totalDayPnL))}`,
                 sub: null,
                 color: pnlColor(totalDayPnL),
+                tooltip:
+                  "Reflects the ticker's full move for the trading day, not just the change since you opened the position.",
               },
               {
                 label: "Cash",
                 value: `$${fmt(cash)}`,
                 sub: `${fmt((cash / portfolioValue) * 100, 1)}% of portfolio`,
                 color: "",
+                tooltip: null,
               },
-            ].map(({ label, value, sub, color }) => (
+            ].map(({ label, value, sub, color, tooltip }) => (
               <div
                 key={label}
                 className="p-5 rounded-lg border-2 border-border bg-card shadow-sm"
               >
-                <p className="text-xs text-muted-foreground mb-1">{label}</p>
+                <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                  {label}
+                  {tooltip && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3 h-3 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[240px]">
+                        <p>{tooltip}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </p>
                 <p className={`text-2xl font-bold ${color || "text-foreground"}`}>{value}</p>
                 {sub && <p className={`text-xs mt-1 ${color || "text-muted-foreground"}`}>{sub}</p>}
               </div>
@@ -540,7 +537,7 @@ const Portfolio = () => {
           </div>
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 };
 

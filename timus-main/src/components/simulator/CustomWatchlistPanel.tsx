@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Plus, X, Loader2, Search, ChevronDown, ChevronUp, Check } from "lucide-react";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, fetchQuotes } from "@/lib/api";
 import type { AuthUser } from "@/context/AuthContext";
 
 interface StockItem {
@@ -128,17 +128,13 @@ const CustomWatchlistPanel = ({ user, token, onSelectTicker }: CustomWatchlistPa
       setWatchlistTickers(new Set(rows.map((r) => r.ticker)));
       setCustomList(rows.map((r) => ({ ticker: r.ticker, name: r.name, price: null, change_pct: null })));
 
-      // Fetch prices for saved watchlist items
-      const priceResults = await Promise.allSettled(
-        rows.map((r) => fetch(`${API_BASE}/api/quote/${r.ticker}`).then((x) => x.json()))
-      );
+      // Fetch prices for saved watchlist items — one batched call
+      const quotes = await fetchQuotes(rows.map((r) => r.ticker));
       const priceMap: Record<string, { price: number; change_pct: number }> = {};
-      priceResults.forEach((result, i) => {
-        if (result.status === "fulfilled" && result.value.price != null) {
-          priceMap[rows[i].ticker] = {
-            price: result.value.price,
-            change_pct: result.value.change_pct ?? 0,
-          };
+      rows.forEach((r) => {
+        const q = quotes[r.ticker];
+        if (q && q.price != null) {
+          priceMap[r.ticker] = { price: q.price, change_pct: q.change_pct ?? 0 };
         }
       });
       setCustomListPrices(priceMap);
@@ -163,24 +159,19 @@ const CustomWatchlistPanel = ({ user, token, onSelectTicker }: CustomWatchlistPa
       setTop50(list);
       setTop50Loaded(true);
 
-      // Fetch prices in parallel (fire-and-forget per batch)
-      const BATCH = 10;
-      for (let i = 0; i < list.length; i += BATCH) {
-        const batch = list.slice(i, i + BATCH);
-        Promise.allSettled(
-          batch.map((item) => fetch(`${API_BASE}/api/quote/${item.ticker}`).then((x) => x.json()))
-        ).then((results) => {
-          setTop50Prices((prev) => {
-            const next = { ...prev };
-            results.forEach((r, j) => {
-              if (r.status === "fulfilled" && r.value.price != null) {
-                next[batch[j].ticker] = { price: r.value.price, change_pct: r.value.change_pct ?? 0 };
-              }
-            });
-            return next;
-          });
+      // Fetch all Top 50 prices in one batched call
+      fetchQuotes(list.map((item) => item.ticker)).then((quotes) => {
+        setTop50Prices((prev) => {
+          const next = { ...prev };
+          for (const item of list) {
+            const q = quotes[item.ticker];
+            if (q && q.price != null) {
+              next[item.ticker] = { price: q.price, change_pct: q.change_pct ?? 0 };
+            }
+          }
+          return next;
         });
-      }
+      });
     } catch {
       // silently ignore
     }
@@ -205,18 +196,16 @@ const CustomWatchlistPanel = ({ user, token, onSelectTicker }: CustomWatchlistPa
         const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(searchQuery)}`);
         if (!res.ok) return;
         const data: { ticker: string; name: string }[] = await res.json();
-        // Fetch prices for search results
-        const priceResults = await Promise.allSettled(
-          data.map((d) => fetch(`${API_BASE}/api/quote/${d.ticker}`).then((x) => x.json()))
-        );
+        // Fetch prices for search results — one batched call
+        const quotes = await fetchQuotes(data.map((d) => d.ticker));
         setSearchResults(
-          data.map((d, i) => {
-            const r = priceResults[i];
+          data.map((d) => {
+            const q = quotes[d.ticker];
             return {
               ticker: d.ticker,
               name: d.name,
-              price: r.status === "fulfilled" ? (r.value.price ?? null) : null,
-              change_pct: r.status === "fulfilled" ? (r.value.change_pct ?? null) : null,
+              price: q?.price ?? null,
+              change_pct: q?.change_pct ?? null,
             };
           })
         );
@@ -240,6 +229,9 @@ const CustomWatchlistPanel = ({ user, token, onSelectTicker }: CustomWatchlistPa
       if (res.ok) {
         setActionState((prev) => ({ ...prev, [ticker]: "added" }));
         setWatchlistTickers((prev) => new Set([...prev, ticker]));
+        // Close the add panel after a successful add — reopen via "Add Stocks"
+        setIsOpen(false);
+        setSearchQuery("");
         // Reload the saved list
         await loadWatchlist();
         setTimeout(() => setActionState((prev) => ({ ...prev, [ticker]: "idle" })), 2000);
@@ -277,7 +269,9 @@ const CustomWatchlistPanel = ({ user, token, onSelectTicker }: CustomWatchlistPa
 
   if (!user) return null;
 
-  const displayList = searchQuery.trim() ? searchResults : top50;
+  const displayList: StockItem[] = searchQuery.trim()
+    ? searchResults
+    : top50.map((t) => ({ ...t, price: null, change_pct: null }));
 
   return (
     <div className="p-6 rounded-lg border-2 border-border bg-card shadow-lg">

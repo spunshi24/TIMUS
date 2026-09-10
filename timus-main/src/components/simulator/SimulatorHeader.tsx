@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, Edit2, UserCircle2 } from "lucide-react";
+import { Search, Edit2, UserCircle2, PanelLeft, PanelLeftClose } from "lucide-react";
 import { API_BASE } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/context/AuthContext";
+import { useSidebar } from "@/context/SidebarContext";
 
 interface TickerResult {
   ticker: string;
@@ -32,6 +34,7 @@ const SimulatorHeader = ({
   onShowWatchlist,
 }: SimulatorHeaderProps) => {
   const { user } = useAuth();
+  const { sidebarOpen, toggleSidebar } = useSidebar();
   const [isEditingBalance, setIsEditingBalance] = useState(false);
   const [tempBalance, setTempBalance] = useState(balance.toString());
 
@@ -40,10 +43,20 @@ const SimulatorHeader = ({
   const [suggestions, setSuggestions] = useState<TickerResult[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Skips the next debounced search when query changed programmatically
+  // (committing a pick or syncing from the parent), not from user typing —
+  // otherwise the autocomplete re-fetches the just-picked ticker and reopens.
+  const skipSearchRef = useRef(false);
 
-  // Keep local query in sync when parent changes ticker externally
+  // Keep local query in sync when parent changes ticker externally.
+  // Only set the skip flag when the value actually changes — otherwise the
+  // search effect never runs to clear it and would swallow the next keystroke.
   useEffect(() => {
-    setQuery(selectedTicker);
+    setQuery((prev) => {
+      if (prev === selectedTicker) return prev;
+      skipSearchRef.current = true;
+      return selectedTicker;
+    });
   }, [selectedTicker]);
 
   // Close dropdown on outside click
@@ -59,6 +72,10 @@ const SimulatorHeader = ({
 
   // Debounced autocomplete fetch
   useEffect(() => {
+    if (skipSearchRef.current) {
+      skipSearchRef.current = false;
+      return;
+    }
     if (!query || query.trim().length === 0) {
       setSuggestions([]);
       setShowDropdown(false);
@@ -80,6 +97,7 @@ const SimulatorHeader = ({
   }, [query]);
 
   const commitTicker = (ticker: string) => {
+    skipSearchRef.current = true;
     setQuery(ticker);
     setSuggestions([]);
     setShowDropdown(false);
@@ -118,6 +136,21 @@ const SimulatorHeader = ({
 
           {/* ── Ticker search with autocomplete ─────────────────────────── */}
           <div className="flex items-center gap-3 flex-1" ref={containerRef}>
+            {user && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={toggleSidebar}
+                    className="hidden md:flex shrink-0 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    {sidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeft className="w-5 h-5" />}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{sidebarOpen ? "Hide sidebar" : "Show sidebar"}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
             {selectedTicker && (
               <button
                 onClick={onShowWatchlist}

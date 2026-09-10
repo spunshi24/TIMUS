@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { TrendingUp, TrendingDown, Loader2 } from "lucide-react";
-import { API_BASE } from "@/lib/api";
+import { fetchQuotes } from "@/lib/api";
 
 const WATCHLIST = [
   "AAPL", "NVDA", "MSFT", "META", "TSLA",
@@ -25,25 +25,21 @@ const WatchlistPanel = ({ selectedTicker, onSelectTicker }: WatchlistPanelProps)
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const controller = new AbortController();
+    let cancelled = false;
 
     const fetchPrices = async () => {
-      const results = await Promise.allSettled(
-        WATCHLIST.map((t) =>
-          fetch(`${API_BASE}/api/quote/${t}`, { signal: controller.signal }).then((r) => r.json())
-        )
-      );
-      if (controller.signal.aborted) return;
-      const loaded: WatchItem[] = results
-        .filter((r): r is PromiseFulfilledResult<Record<string, unknown>> => r.status === "fulfilled")
-        .map((r) => r.value)
-        .filter((d) => typeof d.price === "number")
+      // One batched request for the whole default watchlist
+      const quotes = await fetchQuotes(WATCHLIST);
+      if (cancelled) return;
+      const loaded: WatchItem[] = WATCHLIST
+        .map((t) => quotes[t])
+        .filter((d): d is NonNullable<typeof d> => d != null && typeof d.price === "number")
         .map((d) => ({
-          ticker: d.ticker as string,
-          name: d.name as string,
+          ticker: d.ticker,
+          name: d.name,
           price: d.price as number,
-          change: d.change as number,
-          change_pct: d.change_pct as number,
+          change: (d.change ?? 0) as number,
+          change_pct: (d.change_pct ?? 0) as number,
         }));
       setItems(loaded);
       setLoading(false);
@@ -51,7 +47,7 @@ const WatchlistPanel = ({ selectedTicker, onSelectTicker }: WatchlistPanelProps)
 
     fetchPrices();
     const id = setInterval(fetchPrices, 30_000);
-    return () => { controller.abort(); clearInterval(id); };
+    return () => { cancelled = true; clearInterval(id); };
   }, []);
 
   return (

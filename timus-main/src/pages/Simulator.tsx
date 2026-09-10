@@ -1,17 +1,18 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Zap, X, Mail, Github, Linkedin, Copy, Check } from "lucide-react";
-import Navigation from "@/components/Navigation";
+import { Zap, X } from "lucide-react";
+import AppShell from "@/components/shell/AppShell";
+import ContactCard from "@/components/shell/ContactCard";
 import SimulatorHeader from "@/components/simulator/SimulatorHeader";
 import ChartPanel from "@/components/simulator/ChartPanel";
 import OrderPanel from "@/components/simulator/OrderPanel";
 import TurboPanel from "@/components/simulator/TurboPanel";
 import WatchlistPanel from "@/components/simulator/WatchlistPanel";
 import CustomWatchlistPanel from "@/components/simulator/CustomWatchlistPanel";
-import GameRoomPanel from "@/components/simulator/GameRoomPanel";
-import AuthModal from "@/components/AuthModal";
+import StockPositionsPanel from "@/components/simulator/StockPositionsPanel";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, fetchQuotes } from "@/lib/api";
+import { mergeOrders } from "@/lib/mergeOrders";
 
 export interface Position {
   id: string;
@@ -74,131 +75,39 @@ function BlockedModal({ message, onDismiss }: { message: string; onDismiss: () =
       onClick={onDismiss}
     >
       <div
-        className="bg-zinc-950 border-2 border-red-500/50 rounded-2xl p-8 max-w-sm w-full text-center"
+        className="relative bg-card border-2 border-destructive/50 rounded-2xl p-8 max-w-sm w-full text-center"
         style={{ boxShadow: "0 0 60px rgba(239,68,68,0.25), 0 24px 60px rgba(0,0,0,0.6)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={onDismiss}
-          className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"
+          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
         <div className="text-5xl mb-4">{isMarketClosed ? "🔔" : "🚫"}</div>
-        <h3 className="text-lg font-bold text-white mb-2 leading-snug">{message}</h3>
+        <h3 className="text-lg font-bold text-foreground mb-2 leading-snug">{message}</h3>
         {isMarketClosed && (
-          <p className="text-zinc-400 text-sm mt-2 leading-relaxed">
+          <p className="text-muted-foreground text-sm mt-2 leading-relaxed">
             US equity markets are open<br />
-            <span className="text-white font-semibold">Monday – Friday, 9:30 AM – 4:00 PM ET</span>
+            <span className="text-foreground font-semibold">Monday – Friday, 9:30 AM – 4:00 PM ET</span>
           </p>
         )}
         {message.includes("INSUFFICIENT FUNDS") && (
-          <p className="text-zinc-400 text-sm mt-2">
+          <p className="text-muted-foreground text-sm mt-2">
             Reduce your order size or add more virtual cash.
           </p>
         )}
         {message.includes("INSUFFICIENT SHARES") && (
-          <p className="text-zinc-400 text-sm mt-2">
+          <p className="text-muted-foreground text-sm mt-2">
             You don&apos;t hold enough shares for this order.
           </p>
         )}
         <button
-          className="mt-6 px-8 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl font-semibold transition-colors text-sm"
+          className="mt-6 px-8 py-2.5 bg-muted hover:bg-muted/70 text-foreground rounded-xl font-semibold transition-colors text-sm"
           onClick={onDismiss}
         >
           Dismiss
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Professor demo contact card ─────────────────────────────────────────────
-const EMAIL = "sumitpunshi@gmail.com";
-
-function DemoContactModal({ onClose }: { onClose: () => void }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(EMAIL).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)" }}
-      onClick={onClose}
-    >
-      <div
-        className="relative bg-card rounded-2xl border-2 border-border p-8 max-w-sm w-full text-center"
-        style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        <div className="w-14 h-14 rounded-full bg-foreground flex items-center justify-center mx-auto mb-5">
-          <Mail className="w-7 h-7 text-background" />
-        </div>
-
-        <h3 className="text-xl font-bold text-foreground mb-1">Let's set up your demo</h3>
-        <p className="text-sm text-muted-foreground mb-6">
-          Reach out and we'll walk through a live session with your class.
-        </p>
-
-        {/* Email row */}
-        <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-muted border border-border mb-5">
-          <span className="font-mono text-sm font-semibold text-foreground select-all">{EMAIL}</span>
-          <button
-            onClick={handleCopy}
-            className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-            title="Copy email"
-          >
-            {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-          </button>
-        </div>
-
-        {/* Social links */}
-        <div className="flex gap-3 mb-5">
-          <button
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-border hover:bg-muted transition-colors text-sm font-medium"
-            onClick={() => (window.location.href = "mailto:" + EMAIL + "?subject=TiMUS%20demo%20request")}
-          >
-            <Mail className="w-4 h-4" />
-            Email
-          </button>
-          <a
-            href="https://github.com/spunshi24"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-border hover:bg-muted transition-colors text-sm font-medium"
-          >
-            <Github className="w-4 h-4" />
-            GitHub
-          </a>
-          <a
-            href="https://www.linkedin.com/in/sumit-punshi"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-border hover:bg-muted transition-colors text-sm font-medium"
-          >
-            <Linkedin className="w-4 h-4" />
-            LinkedIn
-          </a>
-        </div>
-
-        <button
-          className="w-full py-2.5 rounded-lg bg-muted hover:bg-muted/70 text-sm font-semibold transition-colors"
-          onClick={onClose}
-        >
-          Close
         </button>
       </div>
     </div>
@@ -209,10 +118,9 @@ function DemoContactModal({ onClose }: { onClose: () => void }) {
 
 const Simulator = () => {
   const { toast } = useToast();
-  const { user, token } = useAuth();
+  const { user, token, openAuthModal, setAuthSuccessHandler } = useAuth();
 
   const [selectedTicker, setSelectedTicker] = useState("");
-  const [authModalOpen, setAuthModalOpen] = useState(false);
   const selectedTickerRef = useRef("");
 
   const [balance, setBalance] = useState<number>(() =>
@@ -242,7 +150,15 @@ const Simulator = () => {
   const positionsRef = useRef<Position[]>(positions);
   const ordersRef = useRef<Order[]>(orders);
   const pricesByTickerRef = useRef<Record<string, number>>({});
-  const workingOrdersRef = useRef<Order[]>([]);
+  const workingOrdersRef = useRef<Order[]>(
+    loadFromStorage("timus_working_orders", [])
+  );
+
+  // Working orders must survive refreshes: every mutation goes through here.
+  const setWorkingOrders = useCallback((next: Order[]) => {
+    workingOrdersRef.current = next;
+    localStorage.setItem("timus_working_orders", JSON.stringify(next));
+  }, []);
 
   // ── Persist to localStorage ─────────────────────────────────────────────
   useEffect(() => {
@@ -273,11 +189,22 @@ const Simulator = () => {
       setPositions([]);
       setOrders([]);
       localStorage.setItem("timus_realized_pnl", "0");
+      setWorkingOrders([]);
       selectedTickerRef.current = "";
       setSelectedTicker("");
     }
     prevUserRef.current = user;
-  }, [user]);
+  }, [user, setWorkingOrders]);
+
+  // ── Jump straight to a ticker when another page asked for it ────────────
+  useEffect(() => {
+    const goto = sessionStorage.getItem("timus_goto_ticker");
+    if (goto) {
+      sessionStorage.removeItem("timus_goto_ticker");
+      selectedTickerRef.current = goto;
+      setSelectedTicker(goto);
+    }
+  }, []);
 
   // ── T key shortcut to toggle Turbo panel ────────────────────────────────
   useEffect(() => {
@@ -363,10 +290,7 @@ const Simulator = () => {
       // Merge orders: combine local + backend by ID so we never lose recent trades
       const localOrders: Record<string, unknown>[] = JSON.parse(localStorage.getItem("timus_orders") || "[]");
       const backendOrders: Record<string, unknown>[] = Array.isArray(data.orders) ? data.orders : [];
-      const byId = new Map<string, Record<string, unknown>>();
-      for (const o of backendOrders) byId.set(o.id as string, o);
-      for (const o of localOrders) byId.set(o.id as string, o); // local wins on conflict
-      const mergedOrders = [...byId.values()];
+      const mergedOrders = mergeOrders(backendOrders, localOrders);
       localStorage.setItem("timus_orders", JSON.stringify(mergedOrders));
 
       setBalance(data.balance);
@@ -399,8 +323,12 @@ const Simulator = () => {
     // Using ordersRef directly (instead of waiting for the useEffect) ensures
     // that syncPortfolio immediately sees the correct order status.
     const commitOrderStatus = (status: "filled" | "cancelled") => {
+      // A filled order records its actual execution price — for market orders
+      // (which never had one) and for limit/stop (whose trigger may differ).
       const next = ordersRef.current.map((o) =>
-        o.id === order.id ? { ...o, status } : o
+        o.id === order.id
+          ? { ...o, status, ...(status === "filled" ? { price: executionPrice } : {}) }
+          : o
       );
       ordersRef.current = next;
       setOrders(next);
@@ -525,8 +453,33 @@ const Simulator = () => {
         stillWorking.push(order);
       }
     }
-    workingOrdersRef.current = stillWorking;
-  }, [fillOrder]);
+    if (stillWorking.length !== workingOrdersRef.current.length) {
+      setWorkingOrders(stillWorking);
+    }
+  }, [fillOrder, setWorkingOrders]);
+
+  // ── Background watcher: poll prices for ALL tickers with working orders ──
+  // Runs regardless of which chart (if any) is open, so limit/stop orders
+  // keep evaluating after you navigate away — and after a full page refresh.
+  useEffect(() => {
+    const checkAllWorkingOrders = async () => {
+      const working = workingOrdersRef.current;
+      if (working.length === 0) return;
+      const tickers = [...new Set(working.map((o) => o.ticker))];
+      // One batched request covers every ticker with a pending working order
+      const quotes = await fetchQuotes(tickers);
+      for (const ticker of tickers) {
+        const price = quotes[ticker]?.price;
+        if (typeof price !== "number" || price <= 0) continue;
+        pricesByTickerRef.current = { ...pricesByTickerRef.current, [ticker]: price };
+        setPricesByTicker((prev) => ({ ...prev, [ticker]: price }));
+        checkWorkingOrders(ticker, price);
+      }
+    };
+    checkAllWorkingOrders();
+    const interval = setInterval(checkAllWorkingOrders, 15_000);
+    return () => clearInterval(interval);
+  }, [checkWorkingOrders]);
 
   // ── Price update from ChartPanel ────────────────────────────────────────
   const handlePriceUpdate = useCallback((price: number) => {
@@ -542,12 +495,18 @@ const Simulator = () => {
     await loadPortfolioFromBackend();
   }, [syncPortfolio, loadPortfolioFromBackend, initialBalance]);
 
+  // Wire this page's post-login sync into the globally rendered AuthModal
+  useEffect(() => {
+    setAuthSuccessHandler(handleAuthSuccess);
+    return () => setAuthSuccessHandler(null);
+  }, [setAuthSuccessHandler, handleAuthSuccess]);
+
   // ── Shared order guard (auth cap + market hours) ────────────────────────
   const guardOrder = (): boolean => {
     if (!user) {
       const anonCount = parseInt(localStorage.getItem("timus_anon_trades") || "0", 10);
       if (anonCount >= 4) {
-        setAuthModalOpen(true);
+        openAuthModal();
         return false;
       }
     }
@@ -629,7 +588,7 @@ const Simulator = () => {
         setOrders((prev) =>
           prev.map((o) => (o.id === newOrder.id ? workingOrder : o))
         );
-        workingOrdersRef.current = [...workingOrdersRef.current, workingOrder];
+        setWorkingOrders([...workingOrdersRef.current, workingOrder]);
         toast({
           title: "Limit Order Working",
           description: `${order.side === "buy" ? "Buy" : "Sell"} ${order.quantity} ${order.ticker} — waiting for $${triggerPrice.toFixed(2)} (now $${livePrice.toFixed(2)})`,
@@ -655,7 +614,7 @@ const Simulator = () => {
         setOrders((prev) =>
           prev.map((o) => (o.id === newOrder.id ? workingOrder : o))
         );
-        workingOrdersRef.current = [...workingOrdersRef.current, workingOrder];
+        setWorkingOrders([...workingOrdersRef.current, workingOrder]);
         toast({
           title: "Stop Order Working",
           description: `${order.side === "sell" ? "Stop-loss" : "Stop-buy"} at $${triggerPrice.toFixed(2)} — triggers when price ${order.side === "sell" ? "falls to" : "rises to"} $${triggerPrice.toFixed(2)} (now $${livePrice.toFixed(2)})`,
@@ -704,13 +663,12 @@ const Simulator = () => {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation />
-      <div className="pt-16">
+    <AppShell>
+      <div>
         {/* Professor demo banner */}
         {isProfDemo && (
-          <div className="bg-zinc-900 border-b border-yellow-500/40 px-4 py-3 text-center">
-            <span className="text-yellow-400 font-semibold text-sm">
+          <div className="bg-yellow-500/10 border-b border-yellow-500/40 px-4 py-3 text-center">
+            <span className="text-yellow-600 dark:text-yellow-400 font-semibold text-sm">
               👋 Educator preview — try a few live trades below. Ready to use TiMUS with your class? Hit the{" "}
               <strong>Book a demo</strong> button below.
             </span>
@@ -724,27 +682,35 @@ const Simulator = () => {
           selectedTicker={selectedTicker}
           onTickerChange={handleTickerChange}
           onBalanceChange={handleBalanceChange}
-          onAuthClick={() => setAuthModalOpen(true)}
+          onAuthClick={openAuthModal}
           onShowWatchlist={handleShowWatchlist}
         />
 
         <div className="container mx-auto px-4 py-8 space-y-6">
           {selectedTicker ? (
-            <div className="grid lg:grid-cols-3 gap-6">
-              {/* Chart */}
-              <div className="lg:col-span-2">
-                <ChartPanel ticker={selectedTicker} onPriceUpdate={handlePriceUpdate} />
+            <div className="space-y-6">
+              <div className="grid lg:grid-cols-3 gap-6">
+                {/* Chart */}
+                <div className="lg:col-span-2">
+                  <ChartPanel ticker={selectedTicker} onPriceUpdate={handlePriceUpdate} />
+                </div>
+
+                {/* Order Panel */}
+                <div className="lg:col-span-1">
+                  <OrderPanel
+                    ticker={selectedTicker}
+                    balance={balance}
+                    currentPrice={currentPrice}
+                    onPlaceOrder={handlePlaceOrder}
+                  />
+                </div>
               </div>
 
-              {/* Order Panel */}
-              <div className="lg:col-span-1">
-                <OrderPanel
-                  ticker={selectedTicker}
-                  balance={balance}
-                  currentPrice={currentPrice}
-                  onPlaceOrder={handlePlaceOrder}
-                />
-              </div>
+              {/* All positions across every ticker — hidden when none are held */}
+              <StockPositionsPanel
+                positions={positions}
+                onSelectTicker={handleTickerChange}
+              />
             </div>
           ) : (
             <div className="space-y-6">
@@ -767,19 +733,12 @@ const Simulator = () => {
             <div className="flex justify-center py-2">
               <button
                 onClick={() => setDemoCardOpen(true)}
-                className="px-8 py-3 bg-black border border-zinc-700 hover:bg-zinc-900 text-white font-bold rounded-xl tracking-wide transition-colors"
+                className="px-8 py-3 bg-foreground hover:opacity-90 text-background font-bold rounded-xl tracking-wide transition-opacity"
               >
                 Book a demo
               </button>
             </div>
           )}
-
-          {/* Game Room — always visible */}
-          <GameRoomPanel
-            user={user}
-            token={token}
-            onAuthClick={() => setAuthModalOpen(true)}
-          />
         </div>
       </div>
 
@@ -787,8 +746,7 @@ const Simulator = () => {
       {!turboOpen && (
         <button
           onClick={() => setTurboOpen(true)}
-          className="fixed bottom-6 right-6 z-30 flex items-center gap-2 px-5 py-3 rounded-full font-bold text-white text-sm bg-yellow-500 hover:bg-yellow-400 active:scale-95 transition-all shadow-2xl"
-          style={{ boxShadow: "0 4px 24px rgba(234,179,8,0.4)" }}
+          className="fixed bottom-6 right-6 z-30 flex items-center gap-2 px-5 py-3 rounded-full font-bold text-sm active:scale-95 transition-all text-white bg-yellow-500 hover:bg-yellow-400 shadow-[0_4px_24px_rgba(234,179,8,0.4)] dark:text-success-foreground dark:bg-success dark:hover:bg-success/90 dark:shadow-[0_4px_24px_rgba(34,197,94,0.35)]"
         >
           <Zap className="w-4 h-4" />
           Turbo
@@ -813,15 +771,16 @@ const Simulator = () => {
       )}
 
       {/* Professor demo contact card */}
-      {demoCardOpen && <DemoContactModal onClose={() => setDemoCardOpen(false)} />}
-
-      {/* Auth Modal — shown when anonymous user hits 5-trade limit */}
-      <AuthModal
-        open={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        onSuccess={handleAuthSuccess}
-      />
-    </div>
+      {demoCardOpen && (
+        <ContactCard
+          title="Let's set up your demo"
+          subtitle="Reach out and we'll walk through a live session with your class."
+          showGithub
+          mailSubject="TiMUS demo request"
+          onClose={() => setDemoCardOpen(false)}
+        />
+      )}
+    </AppShell>
   );
 };
 
