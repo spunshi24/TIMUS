@@ -52,10 +52,16 @@ All colors MUST be HSL.
 
     --radius: 0.5rem;
 
+    /* Editorial palette (EducationSection) — HSL equivalents of the former
+       hardcoded hex values, so light mode is pixel-identical */
+    --ink: 26 16% 9%;    /* was #1a1613 */
+    --dim: 35 16% 36%;   /* was #6b5f4e */
+    --ered: 8 72% 42%;   /* was #b8321e */
+
     /* Tech specific */
     --grid-lines: 0 0% 92%;
     --hover-bg: 0 0% 97%;
-    
+
     /* Gradients */
     --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%), hsl(0 0% 98%));
     
@@ -110,6 +116,13 @@ All colors MUST be HSL.
     --border: 0 0% 18%;
     --input: 0 0% 16%;
     --ring: 0 0% 70%;
+
+    /* Editorial palette — warm equivalents that actually read on dark:
+       ink is body/heading text, dim is secondary text, ered is the accent
+       kicker (lifted like --success was, not tied to --destructive) */
+    --ink: 35 15% 88%;
+    --dim: 35 12% 62%;
+    --ered: 8 78% 55%;
 
     /* Tech specific */
     --grid-lines: 0 0% 13%;

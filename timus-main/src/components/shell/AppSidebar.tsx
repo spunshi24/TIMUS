@@ -1,7 +1,6 @@
 import { NavLink } from "react-router-dom";
-import { BarChart2, Briefcase, Star, Newspaper, Trophy, LogOut, UserCircle2, PanelLeftClose } from "lucide-react";
+import { BarChart2, Briefcase, Star, Newspaper, Trophy, LogOut, UserCircle2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useSidebar } from "@/context/SidebarContext";
 import ProfileMenu from "@/components/shell/ProfileMenu";
 
 const NAV_ITEMS = [
@@ -17,23 +16,12 @@ const NAV_ITEMS = [
 // live at the bottom of this sidebar instead.
 export default function AppSidebar() {
   const { user, logout } = useAuth();
-  const { closeSidebar } = useSidebar();
 
   return (
     <aside className="fixed left-0 top-16 bottom-0 z-40 w-60 hidden md:flex flex-col bg-sidebar border-r border-sidebar-border">
-      {/* Collapse control — usable on pages without the simulator search bar */}
-      <div className="flex justify-end px-3 pt-3">
-        <button
-          onClick={closeSidebar}
-          className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors"
-          title="Hide sidebar"
-        >
-          <PanelLeftClose className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Nav items */}
-      <nav className="flex-1 px-3 py-2 space-y-1">
+      {/* Nav items — the sidebar toggle lives in AppShell's bar, the single
+          always-reachable control on every page (F3/F4) */}
+      <nav className="flex-1 px-3 py-4 space-y-1">
         {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
