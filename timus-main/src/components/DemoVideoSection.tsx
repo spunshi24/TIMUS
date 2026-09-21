@@ -77,8 +77,8 @@ const DemoVideoSection = () => {
                 <video
                   ref={videoRef}
                   className="absolute inset-0 w-full h-full object-cover"
-                  src="/videos/demo.mp4"
-                  poster="/images/demo-poster.jpg"
+                  src={`${import.meta.env.BASE_URL}videos/demo.mp4`}
+                  poster={`${import.meta.env.BASE_URL}images/demo-poster.jpg`}
                   muted
                   loop
                   playsInline
