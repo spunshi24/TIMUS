@@ -80,6 +80,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    // Best-effort server-side revocation of the current token so it can't be
+    // reused after logout. Fire-and-forget: we clear local state regardless.
+    const current = token;
+    if (current) {
+      void fetch(`${API_BASE}/api/auth/logout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${current}` },
+      }).catch(() => {
+        /* network error — local logout below still proceeds */
+      });
+    }
     // Clear portfolio data so simulator resets to $100k on next visit
     localStorage.removeItem("timus_balance");
     localStorage.removeItem("timus_initial_balance");

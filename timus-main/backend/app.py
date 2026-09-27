@@ -10,9 +10,11 @@ import psycopg2
 import psycopg2.extras
 import bcrypt
 import json
+import secrets
+from datetime import timedelta
 from flask_jwt_extended import (
     JWTManager, create_access_token,
-    jwt_required, get_jwt_identity,
+    jwt_required, get_jwt_identity, get_jwt,
     verify_jwt_in_request,
 )
 
@@ -27,9 +29,56 @@ CORS(app, origins=[
 ])
 
 # ─── JWT config ──────────────────────────────────────────────────────────────
-app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "dev-secret-change-me")
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False  # tokens don't expire
+# Are we running on Railway (production)? RAILWAY_ENVIRONMENT is injected there.
+IS_PRODUCTION = bool(os.environ.get("RAILWAY_ENVIRONMENT"))
+
+# Fail hard in production if the signing secret is missing, rather than silently
+# falling back to a well-known default value (which would let anyone forge tokens).
+# In local dev we mint a fresh random secret per process instead — no known
+# fallback value ever exists, and dev tokens simply don't survive a restart.
+_jwt_secret = os.environ.get("JWT_SECRET_KEY")
+if not _jwt_secret:
+    if IS_PRODUCTION:
+        raise RuntimeError(
+            "JWT_SECRET_KEY is not set. Refusing to start in production with a "
+            "default signing key. Set JWT_SECRET_KEY in the environment."
+        )
+    _jwt_secret = secrets.token_hex(32)
+    logger.warning(
+        "JWT_SECRET_KEY not set — using an ephemeral random secret for this "
+        "process (dev only). Existing tokens will be invalid after a restart."
+    )
+
+app.config["JWT_SECRET_KEY"] = _jwt_secret
+# Sane, bounded lifetime — a token is no longer valid forever once issued.
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=24)
 jwt = JWTManager(app)
+
+
+@jwt.token_in_blocklist_loader
+def _token_is_revoked(_jwt_header, jwt_payload) -> bool:
+    """Return True if this token's jti has been revoked (logout / password reset).
+
+    Fails open on a DB error so a transient outage can't lock every user out;
+    the trade-off is that a revoked token would be briefly honoured during such
+    an outage, which is acceptable for this app.
+    """
+    if not DATABASE_URL:
+        return False
+    jti = jwt_payload.get("jti")
+    if not jti:
+        return False
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM token_blocklist WHERE jti = %s", (jti,))
+        revoked = cur.fetchone() is not None
+        cur.close()
+        conn.close()
+        return revoked
+    except Exception as e:
+        logger.error("token blocklist check failed (failing open): %s", e)
+        return False
 
 # ─── Cache ───────────────────────────────────────────────────────────────────
 QUOTE_CACHE_DURATION   = 15    # seconds — live prices (matches the chart's poll rate)
@@ -131,6 +180,14 @@ def init_db():
                     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
                     joined_at TIMESTAMP DEFAULT NOW(),
                     UNIQUE(game_room_id, user_id)
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS token_blocklist (
+                    id SERIAL PRIMARY KEY,
+                    jti TEXT UNIQUE NOT NULL,
+                    expires_at TIMESTAMP NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW()
                 );
             """)
             conn.commit()
@@ -785,6 +842,38 @@ def login():
         return jsonify({"error": "Invalid email or password"}), 401
     token = create_access_token(identity=str(user["id"]))
     return jsonify({"token": token, "user": {"username": user["username"], "email": user["email"]}})
+
+
+@app.route("/api/auth/logout", methods=["POST"])
+@jwt_required()
+def logout():
+    """Revoke the caller's current token server-side so it can't be reused.
+
+    Without this, "logout" only clears the client and a copied token stays valid
+    until it expires. Revoking the jti makes logout real.
+    """
+    if not DATABASE_URL:
+        return jsonify({"msg": "logged out"}), 200
+    claims = get_jwt()
+    jti = claims["jti"]
+    exp = claims["exp"]  # unix timestamp of this token's expiry
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO token_blocklist (jti, expires_at) VALUES (%s, to_timestamp(%s)) "
+            "ON CONFLICT (jti) DO NOTHING",
+            (jti, exp),
+        )
+        # Opportunistic cleanup so the table doesn't grow without bound.
+        cur.execute("DELETE FROM token_blocklist WHERE expires_at < NOW()")
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        logger.error("logout revoke failed: %s", e)
+        return jsonify({"error": "Could not complete logout"}), 500
+    return jsonify({"msg": "logged out"}), 200
 
 
 # ─── Portfolio routes ─────────────────────────────────────────────────────────
