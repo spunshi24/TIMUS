@@ -1,3 +1,4 @@
+from __future__ import annotations
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import yfinance as yf
@@ -826,6 +827,71 @@ def search_tickers():
     return jsonify(results)
 
 
+# ─── Password policy ───────────────────────────────────────────────────────────
+MIN_PASSWORD_LENGTH = 12
+
+# A tiny blocklist of common weak choices that are still >= 12 chars (short ones
+# are already rejected by the length rule). HIBP catches the long tail; this is a
+# cheap local first pass that needs no network call.
+_COMMON_WEAK_PASSWORDS = {
+    "password1234", "passwordpassword", "123456789012", "1234567890123",
+    "qwertyuiop12", "qwertyuiopas", "iloveyou1234", "letmein12345",
+    "adminadmin12", "welcome12345",
+}
+
+
+def password_is_pwned(password: str) -> bool:
+    """Check the password against Have I Been Pwned via k-anonymity.
+
+    Only the first 5 chars of the SHA-1 hash ever leave the server; the full
+    password and full hash never do. Fails OPEN (returns False) on any error or
+    timeout so account actions don't depend on a third party's uptime.
+    """
+    import hashlib
+    import urllib.request
+
+    sha1 = hashlib.sha1(password.encode("utf-8")).hexdigest().upper()
+    prefix, suffix = sha1[:5], sha1[5:]
+    try:
+        req = urllib.request.Request(
+            f"https://api.pwnedpasswords.com/range/{prefix}",
+            headers={"User-Agent": "timus-password-check"},
+        )
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            body = resp.read().decode("utf-8")
+    except Exception as e:
+        logger.warning("HIBP check unavailable, allowing password (fail-open): %s", e)
+        return False
+    for line in body.splitlines():
+        hash_suffix, _, _count = line.partition(":")
+        if hash_suffix.strip().upper() == suffix:
+            return True
+    return False
+
+
+def validate_new_password(password: str, username: str = "", email: str = "") -> str | None:
+    """Return an error message if the password is unacceptable, else None.
+
+    Server-side enforcement — this is the real gate; client-side checks are UX only.
+    """
+    if len(password) < MIN_PASSWORD_LENGTH:
+        return f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
+    lowered = password.lower()
+    if lowered in _COMMON_WEAK_PASSWORDS or len(set(password)) < 4:
+        return "Password is too weak — please choose a less common password"
+    identifiers = []
+    if username:
+        identifiers.append(username.lower())
+    if email and "@" in email:
+        identifiers.append(email.split("@", 1)[0].lower())
+    for ident in identifiers:
+        if len(ident) >= 3 and ident in lowered:
+            return "Password must not contain your username or email"
+    if password_is_pwned(password):
+        return "This password has appeared in a known data breach — please choose a different one"
+    return None
+
+
 # ─── Auth routes ─────────────────────────────────────────────────────────────
 
 @app.route("/api/auth/register", methods=["POST"])
@@ -840,8 +906,9 @@ def register():
     password = data.get("password") or ""
     if not username or not email or not password:
         return jsonify({"error": "username, email and password are required"}), 400
-    if len(password) < 6:
-        return jsonify({"error": "Password must be at least 6 characters"}), 400
+    pw_error = validate_new_password(password, username=username, email=email)
+    if pw_error:
+        return jsonify({"error": pw_error}), 400
     password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     try:
         conn = get_db()
