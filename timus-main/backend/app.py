@@ -17,11 +17,18 @@ from flask_jwt_extended import (
     jwt_required, get_jwt_identity, get_jwt,
     verify_jwt_in_request,
 )
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+# Railway terminates TLS and proxies to the app, so the real client IP is in
+# X-Forwarded-For. Trust one proxy hop so rate-limit keys are per-client, not
+# per-proxy (otherwise every request shares one key and limits are useless).
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 CORS(app, origins=[
     "https://spunshi24.github.io",
     "http://localhost:5173",
@@ -79,6 +86,39 @@ def _token_is_revoked(_jwt_header, jwt_payload) -> bool:
     except Exception as e:
         logger.error("token blocklist check failed (failing open): %s", e)
         return False
+
+
+# ─── Rate limiting ─────────────────────────────────────────────────────────────
+# Protects auth endpoints from brute-force / credential-stuffing. Keyed by client
+# IP and, separately, by the submitted email/username so one attacker can't spread
+# guesses for a single account across many IPs (or rotate accounts from one IP).
+# NOTE: in-memory storage is per-process — fine for the current single-process
+# Flask server. If this ever runs under multiple workers, switch storage_uri to a
+# shared backend (e.g. Redis) or limits become per-worker.
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=[],          # no global limit — only the auth routes below
+    storage_uri="memory://",
+    strategy="fixed-window",
+)
+
+
+def _credential_key() -> str:
+    """Rate-limit key derived from the submitted account identifier.
+
+    Falls back to the client IP if no identifier is present, so a body-less
+    flood still gets counted somewhere.
+    """
+    data = request.get_json(silent=True) or {}
+    ident = (data.get("email") or data.get("username") or "").strip().lower()
+    return f"cred:{ident}" if ident else f"ip:{get_remote_address()}"
+
+
+@app.errorhandler(429)
+def _ratelimit_exceeded(_e):
+    # Generic message — never reveal which key (IP vs account) tripped the limit.
+    return jsonify({"error": "Too many attempts. Please try again later."}), 429
 
 # ─── Cache ───────────────────────────────────────────────────────────────────
 QUOTE_CACHE_DURATION   = 15    # seconds — live prices (matches the chart's poll rate)
@@ -789,6 +829,8 @@ def search_tickers():
 # ─── Auth routes ─────────────────────────────────────────────────────────────
 
 @app.route("/api/auth/register", methods=["POST"])
+@limiter.limit("5 per minute; 20 per hour", key_func=get_remote_address)
+@limiter.limit("5 per minute; 10 per hour", key_func=_credential_key)
 def register():
     if not DATABASE_URL:
         return jsonify({"error": "Database not configured"}), 503
@@ -821,6 +863,8 @@ def register():
 
 
 @app.route("/api/auth/login", methods=["POST"])
+@limiter.limit("10 per minute; 50 per hour", key_func=get_remote_address)
+@limiter.limit("5 per minute; 20 per hour", key_func=_credential_key)
 def login():
     if not DATABASE_URL:
         return jsonify({"error": "Database not configured"}), 503
