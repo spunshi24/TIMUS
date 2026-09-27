@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
+import { API_BASE } from "@/lib/api";
 
 interface AuthModalProps {
   open: boolean;
@@ -21,6 +22,7 @@ export default function AuthModal({ open, onClose, onSuccess }: AuthModalProps) 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   if (!open) return null;
@@ -30,6 +32,35 @@ export default function AuthModal({ open, onClose, onSuccess }: AuthModalProps) 
     setEmail("");
     setPassword("");
     setError(null);
+    setNotice(null);
+  };
+
+  const handleForgotPassword = async () => {
+    setError(null);
+    setNotice(null);
+    if (!email.trim()) {
+      setError("Enter your email above, then tap “Forgot password?” again.");
+      return;
+    }
+    setLoading(true);
+    try {
+      // Response is intentionally generic whether or not the account exists.
+      await fetch(`${API_BASE}/api/auth/request-reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      setNotice(
+        "If an account exists for that email, we've sent password reset instructions.",
+      );
+    } catch {
+      // Still show the generic notice — don't reveal network/account state.
+      setNotice(
+        "If an account exists for that email, we've sent password reset instructions.",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const switchTab = (t: Tab) => {
@@ -157,15 +188,31 @@ export default function AuthModal({ open, onClose, onSuccess }: AuthModalProps) 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={6}
+              minLength={tab === "signup" ? 12 : undefined}
               disabled={loading}
               className="bg-muted border-border text-foreground placeholder:text-muted-foreground/60 focus-visible:ring-ring"
             />
+            {tab === "login" && (
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={loading}
+                className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2 disabled:opacity-60"
+              >
+                Forgot password?
+              </button>
+            )}
           </div>
 
           {error && (
             <p className="text-destructive text-xs bg-destructive/10 border border-destructive/30 rounded-lg px-3 py-2">
               {error}
+            </p>
+          )}
+
+          {notice && (
+            <p className="text-foreground/80 text-xs bg-muted border border-border rounded-lg px-3 py-2">
+              {notice}
             </p>
           )}
 

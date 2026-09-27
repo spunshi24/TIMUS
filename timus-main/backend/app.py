@@ -65,7 +65,12 @@ jwt = JWTManager(app)
 
 @jwt.token_in_blocklist_loader
 def _token_is_revoked(_jwt_header, jwt_payload) -> bool:
-    """Return True if this token's jti has been revoked (logout / password reset).
+    """Return True if this token is no longer valid.
+
+    A token is revoked if (a) its jti was explicitly blocklisted (logout), or
+    (b) it was issued before the user's sessions_valid_after cutoff, which a
+    password reset bumps to "now" — evicting every session that existed before
+    the reset, not just changing the password underneath them.
 
     Fails open on a DB error so a transient outage can't lock every user out;
     the trade-off is that a revoked token would be briefly honoured during such
@@ -74,18 +79,30 @@ def _token_is_revoked(_jwt_header, jwt_payload) -> bool:
     if not DATABASE_URL:
         return False
     jti = jwt_payload.get("jti")
-    if not jti:
-        return False
     try:
         conn = get_db()
         cur = conn.cursor()
-        cur.execute("SELECT 1 FROM token_blocklist WHERE jti = %s", (jti,))
-        revoked = cur.fetchone() is not None
+        if jti:
+            cur.execute("SELECT 1 FROM token_blocklist WHERE jti = %s", (jti,))
+            if cur.fetchone() is not None:
+                cur.close()
+                conn.close()
+                return True
+        sub = jwt_payload.get("sub")
+        issued_at = jwt_payload.get("iat")
+        if sub is not None and issued_at is not None:
+            cur.execute("SELECT sessions_valid_after FROM users WHERE id = %s", (int(sub),))
+            row = cur.fetchone()
+            cutoff = row[0] if row else None
+            if cutoff is not None and issued_at < cutoff:
+                cur.close()
+                conn.close()
+                return True
         cur.close()
         conn.close()
-        return revoked
+        return False
     except Exception as e:
-        logger.error("token blocklist check failed (failing open): %s", e)
+        logger.error("token revocation check failed (failing open): %s", e)
         return False
 
 
@@ -228,6 +245,20 @@ def init_db():
                     id SERIAL PRIMARY KEY,
                     jti TEXT UNIQUE NOT NULL,
                     expires_at TIMESTAMP NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW()
+                );
+            """)
+            # Session cutoff (unix seconds). Tokens issued before this are invalid.
+            cur.execute(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS sessions_valid_after BIGINT;"
+            )
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    token_hash TEXT UNIQUE NOT NULL,
+                    expires_at TIMESTAMP NOT NULL,
+                    used_at TIMESTAMP,
                     created_at TIMESTAMP DEFAULT NOW()
                 );
             """)
@@ -892,6 +923,68 @@ def validate_new_password(password: str, username: str = "", email: str = "") ->
     return None
 
 
+# ─── Password reset ─────────────────────────────────────────────────────────────
+RESET_TOKEN_TTL_MINUTES = 30
+# Where the emailed reset link points (the SPA reset page). Overridable per env.
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://spunshi24.github.io/TIMUS")
+# Resend "from" address. onboarding@resend.dev works with no verified domain but
+# only delivers to your own Resend account email — set a verified-domain sender
+# (e.g. "TiMUS <noreply@yourdomain>") for real users. See setup notes.
+MAIL_FROM = os.environ.get("MAIL_FROM", "TiMUS <onboarding@resend.dev>")
+
+# Generic response so the endpoint never reveals whether an account exists.
+_RESET_GENERIC_MSG = {
+    "msg": "If an account exists for that email, we've sent password reset instructions."
+}
+
+
+def _hash_reset_token(raw: str) -> str:
+    import hashlib
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def send_reset_email(to_email: str, raw_token: str) -> None:
+    """Send the reset link via Resend. Best-effort: logs and returns on failure
+    (the caller always responds generically regardless)."""
+    import urllib.request
+
+    reset_url = f"{FRONTEND_URL}/reset-password?token={raw_token}"
+    api_key = os.environ.get("RESEND_API_KEY")
+    if not api_key:
+        if IS_PRODUCTION:
+            logger.error("RESEND_API_KEY not set — cannot send password reset email")
+        else:
+            # Dev convenience only; never logged in production.
+            logger.warning("RESEND_API_KEY not set — dev reset link: %s", reset_url)
+        return
+
+    body = json.dumps({
+        "from": MAIL_FROM,
+        "to": [to_email],
+        "subject": "Reset your TiMUS password",
+        "html": (
+            f"<p>We received a request to reset your TiMUS password.</p>"
+            f"<p><a href=\"{reset_url}\">Reset your password</a> "
+            f"(link expires in {RESET_TOKEN_TTL_MINUTES} minutes).</p>"
+            f"<p>If you didn't request this, you can safely ignore this email.</p>"
+        ),
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=body,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            resp.read()
+    except Exception as e:
+        logger.error("Resend send failed for reset email: %s", e)
+
+
 # ─── Auth routes ─────────────────────────────────────────────────────────────
 
 @app.route("/api/auth/register", methods=["POST"])
@@ -985,6 +1078,104 @@ def logout():
         logger.error("logout revoke failed: %s", e)
         return jsonify({"error": "Could not complete logout"}), 500
     return jsonify({"msg": "logged out"}), 200
+
+
+@app.route("/api/auth/request-reset", methods=["POST"])
+@limiter.limit("5 per minute; 20 per hour", key_func=get_remote_address)
+@limiter.limit("3 per minute; 10 per hour", key_func=_credential_key)
+def request_reset():
+    """Begin a password reset. Always responds generically (no enumeration)."""
+    if not DATABASE_URL:
+        return jsonify({"error": "Database not configured"}), 503
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    if not email:
+        return jsonify({"error": "email is required"}), 400
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+        user = cur.fetchone()
+        if user:
+            raw_token = secrets.token_urlsafe(32)
+            token_hash = _hash_reset_token(raw_token)
+            # Invalidate any other outstanding reset tokens for this user first.
+            cur.execute(
+                "UPDATE password_reset_tokens SET used_at = NOW() "
+                "WHERE user_id = %s AND used_at IS NULL",
+                (user["id"],),
+            )
+            cur.execute(
+                "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) "
+                "VALUES (%s, %s, NOW() + make_interval(mins => %s))",
+                (user["id"], token_hash, RESET_TOKEN_TTL_MINUTES),
+            )
+            conn.commit()
+            send_reset_email(email, raw_token)  # best-effort, after commit
+        cur.close()
+        conn.close()
+    except Exception as e:
+        logger.error("request_reset failed: %s", e)
+        # Still respond generically — don't leak internal state.
+        return jsonify(_RESET_GENERIC_MSG), 200
+    return jsonify(_RESET_GENERIC_MSG), 200
+
+
+@app.route("/api/auth/reset-password", methods=["POST"])
+@limiter.limit("5 per minute; 20 per hour", key_func=get_remote_address)
+def reset_password():
+    """Complete a password reset: verify token, set new password, evict sessions."""
+    if not DATABASE_URL:
+        return jsonify({"error": "Database not configured"}), 503
+    data = request.get_json(silent=True) or {}
+    raw_token = (data.get("token") or "").strip()
+    new_password = data.get("password") or ""
+    if not raw_token or not new_password:
+        return jsonify({"error": "token and password are required"}), 400
+    token_hash = _hash_reset_token(raw_token)
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "SELECT prt.id AS token_id, prt.used_at, (NOW() > prt.expires_at) AS is_expired, "
+            "u.id AS user_id, u.username, u.email "
+            "FROM password_reset_tokens prt JOIN users u ON u.id = prt.user_id "
+            "WHERE prt.token_hash = %s",
+            (token_hash,),
+        )
+        row = cur.fetchone()
+        if not row or row["used_at"] is not None or row["is_expired"]:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Invalid or expired reset token"}), 400
+
+        pw_error = validate_new_password(
+            new_password, username=row["username"] or "", email=row["email"] or ""
+        )
+        if pw_error:
+            cur.close()
+            conn.close()
+            return jsonify({"error": pw_error}), 400
+
+        password_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+        cutoff = int(time.time())
+        cur.execute(
+            "UPDATE users SET password_hash = %s, sessions_valid_after = %s WHERE id = %s",
+            (password_hash, cutoff, row["user_id"]),
+        )
+        # Consume this token and invalidate any other outstanding ones.
+        cur.execute(
+            "UPDATE password_reset_tokens SET used_at = NOW() "
+            "WHERE user_id = %s AND used_at IS NULL",
+            (row["user_id"],),
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        logger.error("reset_password failed: %s", e)
+        return jsonify({"error": "Could not reset password"}), 500
+    return jsonify({"msg": "Password updated. Please log in with your new password."}), 200
 
 
 # ─── Portfolio routes ─────────────────────────────────────────────────────────
