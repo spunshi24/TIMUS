@@ -113,8 +113,20 @@ def _token_is_revoked(_jwt_header, jwt_payload) -> bool:
 # NOTE: in-memory storage is per-process — fine for the current single-process
 # Flask server. If this ever runs under multiple workers, switch storage_uri to a
 # shared backend (e.g. Redis) or limits become per-worker.
+def _client_ip() -> str:
+    """The client's IP for rate-limit keying.
+
+    Railway's edge documents X-Real-IP as the canonical client-remote-IP header
+    (networking specs), so we trust it first. We deliberately do NOT trust a
+    client-supplied X-Forwarded-For, whose edge overwrite-vs-append behaviour is
+    undocumented — trusting it would let an attacker rotate a spoofed value to
+    reset the per-IP counter. Falls back to remote_addr for local/dev.
+    """
+    return request.headers.get("X-Real-IP") or get_remote_address()
+
+
 limiter = Limiter(
-    key_func=get_remote_address,
+    key_func=_client_ip,
     app=app,
     default_limits=[],          # no global limit — only the auth routes below
     storage_uri="memory://",
@@ -130,7 +142,7 @@ def _credential_key() -> str:
     """
     data = request.get_json(silent=True) or {}
     ident = (data.get("email") or data.get("username") or "").strip().lower()
-    return f"cred:{ident}" if ident else f"ip:{get_remote_address()}"
+    return f"cred:{ident}" if ident else f"ip:{_client_ip()}"
 
 
 @app.errorhandler(429)
@@ -988,7 +1000,7 @@ def send_reset_email(to_email: str, raw_token: str) -> None:
 # ─── Auth routes ─────────────────────────────────────────────────────────────
 
 @app.route("/api/auth/register", methods=["POST"])
-@limiter.limit("5 per minute; 20 per hour", key_func=get_remote_address)
+@limiter.limit("5 per minute; 20 per hour", key_func=_client_ip)
 @limiter.limit("5 per minute; 10 per hour", key_func=_credential_key)
 def register():
     if not DATABASE_URL:
@@ -1023,7 +1035,7 @@ def register():
 
 
 @app.route("/api/auth/login", methods=["POST"])
-@limiter.limit("10 per minute; 50 per hour", key_func=get_remote_address)
+@limiter.limit("10 per minute; 50 per hour", key_func=_client_ip)
 @limiter.limit("5 per minute; 20 per hour", key_func=_credential_key)
 def login():
     if not DATABASE_URL:
@@ -1081,7 +1093,7 @@ def logout():
 
 
 @app.route("/api/auth/request-reset", methods=["POST"])
-@limiter.limit("5 per minute; 20 per hour", key_func=get_remote_address)
+@limiter.limit("5 per minute; 20 per hour", key_func=_client_ip)
 @limiter.limit("3 per minute; 10 per hour", key_func=_credential_key)
 def request_reset():
     """Begin a password reset. Always responds generically (no enumeration)."""
@@ -1122,7 +1134,7 @@ def request_reset():
 
 
 @app.route("/api/auth/reset-password", methods=["POST"])
-@limiter.limit("5 per minute; 20 per hour", key_func=get_remote_address)
+@limiter.limit("5 per minute; 20 per hour", key_func=_client_ip)
 def reset_password():
     """Complete a password reset: verify token, set new password, evict sessions."""
     if not DATABASE_URL:
