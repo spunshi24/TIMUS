@@ -1027,6 +1027,14 @@ def register():
         cur.close()
         conn.close()
     except psycopg2.errors.UniqueViolation:
+        # KNOWN, DELIBERATELY-ACCEPTED TRADE-OFF: this 409 reveals that an
+        # account with the given email/username already exists (account
+        # enumeration). Fully closing it would require an email-verification
+        # signup flow (register always returns a generic "check your email",
+        # no instant login) — not worth that friction for a paper-trading
+        # simulator with no financial stakes or sensitive PII. Mass enumeration
+        # is already throttled by the rate limits on this route, and login does
+        # not enumerate. Revisit if TiMUS ever handles real money/PII.
         return jsonify({"error": "Username or email already in use"}), 409
     except Exception as e:
         return jsonify({"error": str(e)}), 500
