@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from "react";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, setUnauthorizedHandler } from "@/lib/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -113,6 +113,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
   const notifyAuthSuccess = useCallback(() => {
     authSuccessHandlerRef.current?.();
+  }, []);
+
+  // ── Forced logout on 401 ────────────────────────────────────────────────
+  // Keep a live ref to logout/openAuthModal so the handler registered once on
+  // mount always calls the current versions without re-registering.
+  const forcedLogoutRef = useRef<() => void>(() => {});
+  forcedLogoutRef.current = () => {
+    logout();
+    openAuthModal();
+  };
+  useEffect(() => {
+    // Any authenticated request that 401s means the session is no longer valid
+    // (expired, revoked, or rejected after a JWT_SECRET_KEY rotation). Clear it
+    // and prompt re-auth instead of leaving the UI on failing calls.
+    setUnauthorizedHandler(() => forcedLogoutRef.current());
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   return (
