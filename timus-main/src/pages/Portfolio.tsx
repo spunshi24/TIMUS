@@ -8,7 +8,7 @@ import { mergeOrders } from "@/lib/mergeOrders";
 import { aggregatePositions } from "@/lib/portfolio";
 import PositionsPanel from "@/components/simulator/PositionsPanel";
 import type { Position, Order } from "./Simulator";
-import { API_BASE, fetchQuotes } from "@/lib/api";
+import { API_BASE, authFetch, fetchQuotes } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 interface QuoteSummary {
@@ -149,7 +149,7 @@ const Portfolio = () => {
       // If logged in, pull latest portfolio from backend before rendering
       if (user && token) {
         try {
-          const res = await fetch(`${API_BASE}/api/portfolio/load`, {
+          const res = await authFetch(`${API_BASE}/api/portfolio/load`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (res.ok) {

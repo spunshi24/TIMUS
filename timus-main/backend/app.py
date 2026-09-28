@@ -1,3 +1,4 @@
+from __future__ import annotations
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import yfinance as yf
@@ -10,16 +11,25 @@ import psycopg2
 import psycopg2.extras
 import bcrypt
 import json
+import secrets
+from datetime import timedelta
 from flask_jwt_extended import (
     JWTManager, create_access_token,
-    jwt_required, get_jwt_identity,
+    jwt_required, get_jwt_identity, get_jwt,
     verify_jwt_in_request,
 )
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+# Railway terminates TLS and proxies to the app, so the real client IP is in
+# X-Forwarded-For. Trust one proxy hop so rate-limit keys are per-client, not
+# per-proxy (otherwise every request shares one key and limits are useless).
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 CORS(app, origins=[
     "https://spunshi24.github.io",
     "http://localhost:5173",
@@ -27,9 +37,118 @@ CORS(app, origins=[
 ])
 
 # ─── JWT config ──────────────────────────────────────────────────────────────
-app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "dev-secret-change-me")
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False  # tokens don't expire
+# Are we running on Railway (production)? RAILWAY_ENVIRONMENT is injected there.
+IS_PRODUCTION = bool(os.environ.get("RAILWAY_ENVIRONMENT"))
+
+# Fail hard in production if the signing secret is missing, rather than silently
+# falling back to a well-known default value (which would let anyone forge tokens).
+# In local dev we mint a fresh random secret per process instead — no known
+# fallback value ever exists, and dev tokens simply don't survive a restart.
+_jwt_secret = os.environ.get("JWT_SECRET_KEY")
+if not _jwt_secret:
+    if IS_PRODUCTION:
+        raise RuntimeError(
+            "JWT_SECRET_KEY is not set. Refusing to start in production with a "
+            "default signing key. Set JWT_SECRET_KEY in the environment."
+        )
+    _jwt_secret = secrets.token_hex(32)
+    logger.warning(
+        "JWT_SECRET_KEY not set — using an ephemeral random secret for this "
+        "process (dev only). Existing tokens will be invalid after a restart."
+    )
+
+app.config["JWT_SECRET_KEY"] = _jwt_secret
+# Sane, bounded lifetime — a token is no longer valid forever once issued.
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=24)
 jwt = JWTManager(app)
+
+
+@jwt.token_in_blocklist_loader
+def _token_is_revoked(_jwt_header, jwt_payload) -> bool:
+    """Return True if this token is no longer valid.
+
+    A token is revoked if (a) its jti was explicitly blocklisted (logout), or
+    (b) it was issued before the user's sessions_valid_after cutoff, which a
+    password reset bumps to "now" — evicting every session that existed before
+    the reset, not just changing the password underneath them.
+
+    Fails open on a DB error so a transient outage can't lock every user out;
+    the trade-off is that a revoked token would be briefly honoured during such
+    an outage, which is acceptable for this app.
+    """
+    if not DATABASE_URL:
+        return False
+    jti = jwt_payload.get("jti")
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        if jti:
+            cur.execute("SELECT 1 FROM token_blocklist WHERE jti = %s", (jti,))
+            if cur.fetchone() is not None:
+                cur.close()
+                conn.close()
+                return True
+        sub = jwt_payload.get("sub")
+        issued_at = jwt_payload.get("iat")
+        if sub is not None and issued_at is not None:
+            cur.execute("SELECT sessions_valid_after FROM users WHERE id = %s", (int(sub),))
+            row = cur.fetchone()
+            cutoff = row[0] if row else None
+            if cutoff is not None and issued_at < cutoff:
+                cur.close()
+                conn.close()
+                return True
+        cur.close()
+        conn.close()
+        return False
+    except Exception as e:
+        logger.error("token revocation check failed (failing open): %s", e)
+        return False
+
+
+# ─── Rate limiting ─────────────────────────────────────────────────────────────
+# Protects auth endpoints from brute-force / credential-stuffing. Keyed by client
+# IP and, separately, by the submitted email/username so one attacker can't spread
+# guesses for a single account across many IPs (or rotate accounts from one IP).
+# NOTE: in-memory storage is per-process — fine for the current single-process
+# Flask server. If this ever runs under multiple workers, switch storage_uri to a
+# shared backend (e.g. Redis) or limits become per-worker.
+def _client_ip() -> str:
+    """The client's IP for rate-limit keying.
+
+    Railway's edge documents X-Real-IP as the canonical client-remote-IP header
+    (networking specs), so we trust it first. We deliberately do NOT trust a
+    client-supplied X-Forwarded-For, whose edge overwrite-vs-append behaviour is
+    undocumented — trusting it would let an attacker rotate a spoofed value to
+    reset the per-IP counter. Falls back to remote_addr for local/dev.
+    """
+    return request.headers.get("X-Real-IP") or get_remote_address()
+
+
+limiter = Limiter(
+    key_func=_client_ip,
+    app=app,
+    default_limits=[],          # no global limit — only the auth routes below
+    storage_uri="memory://",
+    strategy="fixed-window",
+)
+
+
+def _credential_key() -> str:
+    """Rate-limit key derived from the submitted account identifier.
+
+    Falls back to the client IP if no identifier is present, so a body-less
+    flood still gets counted somewhere.
+    """
+    data = request.get_json(silent=True) or {}
+    ident = (data.get("email") or data.get("username") or "").strip().lower()
+    return f"cred:{ident}" if ident else f"ip:{_client_ip()}"
+
+
+@app.errorhandler(429)
+def _ratelimit_exceeded(_e):
+    # Generic message — never reveal which key (IP vs account) tripped the limit.
+    return jsonify({"error": "Too many attempts. Please try again later."}), 429
 
 # ─── Cache ───────────────────────────────────────────────────────────────────
 QUOTE_CACHE_DURATION   = 15    # seconds — live prices (matches the chart's poll rate)
@@ -131,6 +250,28 @@ def init_db():
                     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
                     joined_at TIMESTAMP DEFAULT NOW(),
                     UNIQUE(game_room_id, user_id)
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS token_blocklist (
+                    id SERIAL PRIMARY KEY,
+                    jti TEXT UNIQUE NOT NULL,
+                    expires_at TIMESTAMP NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW()
+                );
+            """)
+            # Session cutoff (unix seconds). Tokens issued before this are invalid.
+            cur.execute(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS sessions_valid_after BIGINT;"
+            )
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    token_hash TEXT UNIQUE NOT NULL,
+                    expires_at TIMESTAMP NOT NULL,
+                    used_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT NOW()
                 );
             """)
             conn.commit()
@@ -729,9 +870,138 @@ def search_tickers():
     return jsonify(results)
 
 
+# ─── Password policy ───────────────────────────────────────────────────────────
+MIN_PASSWORD_LENGTH = 12
+
+# A tiny blocklist of common weak choices that are still >= 12 chars (short ones
+# are already rejected by the length rule). HIBP catches the long tail; this is a
+# cheap local first pass that needs no network call.
+_COMMON_WEAK_PASSWORDS = {
+    "password1234", "passwordpassword", "123456789012", "1234567890123",
+    "qwertyuiop12", "qwertyuiopas", "iloveyou1234", "letmein12345",
+    "adminadmin12", "welcome12345",
+}
+
+
+def password_is_pwned(password: str) -> bool:
+    """Check the password against Have I Been Pwned via k-anonymity.
+
+    Only the first 5 chars of the SHA-1 hash ever leave the server; the full
+    password and full hash never do. Fails OPEN (returns False) on any error or
+    timeout so account actions don't depend on a third party's uptime.
+    """
+    import hashlib
+    import urllib.request
+
+    sha1 = hashlib.sha1(password.encode("utf-8")).hexdigest().upper()
+    prefix, suffix = sha1[:5], sha1[5:]
+    try:
+        req = urllib.request.Request(
+            f"https://api.pwnedpasswords.com/range/{prefix}",
+            headers={"User-Agent": "timus-password-check"},
+        )
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            body = resp.read().decode("utf-8")
+    except Exception as e:
+        logger.warning("HIBP check unavailable, allowing password (fail-open): %s", e)
+        return False
+    for line in body.splitlines():
+        hash_suffix, _, _count = line.partition(":")
+        if hash_suffix.strip().upper() == suffix:
+            return True
+    return False
+
+
+def validate_new_password(password: str, username: str = "", email: str = "") -> str | None:
+    """Return an error message if the password is unacceptable, else None.
+
+    Server-side enforcement — this is the real gate; client-side checks are UX only.
+    """
+    if len(password) < MIN_PASSWORD_LENGTH:
+        return f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
+    lowered = password.lower()
+    if lowered in _COMMON_WEAK_PASSWORDS or len(set(password)) < 4:
+        return "Password is too weak — please choose a less common password"
+    identifiers = []
+    if username:
+        identifiers.append(username.lower())
+    if email and "@" in email:
+        identifiers.append(email.split("@", 1)[0].lower())
+    for ident in identifiers:
+        if len(ident) >= 3 and ident in lowered:
+            return "Password must not contain your username or email"
+    if password_is_pwned(password):
+        return "This password has appeared in a known data breach — please choose a different one"
+    return None
+
+
+# ─── Password reset ─────────────────────────────────────────────────────────────
+RESET_TOKEN_TTL_MINUTES = 30
+# Where the emailed reset link points (the SPA reset page). Overridable per env.
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://spunshi24.github.io/TIMUS")
+# Resend "from" address. onboarding@resend.dev works with no verified domain but
+# only delivers to your own Resend account email — set a verified-domain sender
+# (e.g. "TiMUS <noreply@yourdomain>") for real users. See setup notes.
+MAIL_FROM = os.environ.get("MAIL_FROM", "TiMUS <onboarding@resend.dev>")
+
+# Generic response so the endpoint never reveals whether an account exists.
+_RESET_GENERIC_MSG = {
+    "msg": "If an account exists for that email, we've sent password reset instructions."
+}
+
+
+def _hash_reset_token(raw: str) -> str:
+    import hashlib
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def send_reset_email(to_email: str, raw_token: str) -> None:
+    """Send the reset link via Resend. Best-effort: logs and returns on failure
+    (the caller always responds generically regardless)."""
+    import urllib.request
+
+    reset_url = f"{FRONTEND_URL}/reset-password?token={raw_token}"
+    api_key = os.environ.get("RESEND_API_KEY")
+    if not api_key:
+        if IS_PRODUCTION:
+            logger.error("RESEND_API_KEY not set — cannot send password reset email")
+        else:
+            # Dev convenience only; never logged in production.
+            logger.warning("RESEND_API_KEY not set — dev reset link: %s", reset_url)
+        return
+
+    body = json.dumps({
+        "from": MAIL_FROM,
+        "to": [to_email],
+        "subject": "Reset your TiMUS password",
+        "html": (
+            f"<p>We received a request to reset your TiMUS password.</p>"
+            f"<p><a href=\"{reset_url}\">Reset your password</a> "
+            f"(link expires in {RESET_TOKEN_TTL_MINUTES} minutes).</p>"
+            f"<p>If you didn't request this, you can safely ignore this email.</p>"
+        ),
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=body,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            resp.read()
+    except Exception as e:
+        logger.error("Resend send failed for reset email: %s", e)
+
+
 # ─── Auth routes ─────────────────────────────────────────────────────────────
 
 @app.route("/api/auth/register", methods=["POST"])
+@limiter.limit("5 per minute; 20 per hour", key_func=_client_ip)
+@limiter.limit("5 per minute; 10 per hour", key_func=_credential_key)
 def register():
     if not DATABASE_URL:
         return jsonify({"error": "Database not configured"}), 503
@@ -741,8 +1011,9 @@ def register():
     password = data.get("password") or ""
     if not username or not email or not password:
         return jsonify({"error": "username, email and password are required"}), 400
-    if len(password) < 6:
-        return jsonify({"error": "Password must be at least 6 characters"}), 400
+    pw_error = validate_new_password(password, username=username, email=email)
+    if pw_error:
+        return jsonify({"error": pw_error}), 400
     password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     try:
         conn = get_db()
@@ -756,6 +1027,14 @@ def register():
         cur.close()
         conn.close()
     except psycopg2.errors.UniqueViolation:
+        # KNOWN, DELIBERATELY-ACCEPTED TRADE-OFF: this 409 reveals that an
+        # account with the given email/username already exists (account
+        # enumeration). Fully closing it would require an email-verification
+        # signup flow (register always returns a generic "check your email",
+        # no instant login) — not worth that friction for a paper-trading
+        # simulator with no financial stakes or sensitive PII. Mass enumeration
+        # is already throttled by the rate limits on this route, and login does
+        # not enumerate. Revisit if TiMUS ever handles real money/PII.
         return jsonify({"error": "Username or email already in use"}), 409
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -764,6 +1043,8 @@ def register():
 
 
 @app.route("/api/auth/login", methods=["POST"])
+@limiter.limit("10 per minute; 50 per hour", key_func=_client_ip)
+@limiter.limit("5 per minute; 20 per hour", key_func=_credential_key)
 def login():
     if not DATABASE_URL:
         return jsonify({"error": "Database not configured"}), 503
@@ -785,6 +1066,136 @@ def login():
         return jsonify({"error": "Invalid email or password"}), 401
     token = create_access_token(identity=str(user["id"]))
     return jsonify({"token": token, "user": {"username": user["username"], "email": user["email"]}})
+
+
+@app.route("/api/auth/logout", methods=["POST"])
+@jwt_required()
+def logout():
+    """Revoke the caller's current token server-side so it can't be reused.
+
+    Without this, "logout" only clears the client and a copied token stays valid
+    until it expires. Revoking the jti makes logout real.
+    """
+    if not DATABASE_URL:
+        return jsonify({"msg": "logged out"}), 200
+    claims = get_jwt()
+    jti = claims["jti"]
+    exp = claims["exp"]  # unix timestamp of this token's expiry
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO token_blocklist (jti, expires_at) VALUES (%s, to_timestamp(%s)) "
+            "ON CONFLICT (jti) DO NOTHING",
+            (jti, exp),
+        )
+        # Opportunistic cleanup so the table doesn't grow without bound.
+        cur.execute("DELETE FROM token_blocklist WHERE expires_at < NOW()")
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        logger.error("logout revoke failed: %s", e)
+        return jsonify({"error": "Could not complete logout"}), 500
+    return jsonify({"msg": "logged out"}), 200
+
+
+@app.route("/api/auth/request-reset", methods=["POST"])
+@limiter.limit("5 per minute; 20 per hour", key_func=_client_ip)
+@limiter.limit("3 per minute; 10 per hour", key_func=_credential_key)
+def request_reset():
+    """Begin a password reset. Always responds generically (no enumeration)."""
+    if not DATABASE_URL:
+        return jsonify({"error": "Database not configured"}), 503
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    if not email:
+        return jsonify({"error": "email is required"}), 400
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+        user = cur.fetchone()
+        if user:
+            raw_token = secrets.token_urlsafe(32)
+            token_hash = _hash_reset_token(raw_token)
+            # Invalidate any other outstanding reset tokens for this user first.
+            cur.execute(
+                "UPDATE password_reset_tokens SET used_at = NOW() "
+                "WHERE user_id = %s AND used_at IS NULL",
+                (user["id"],),
+            )
+            cur.execute(
+                "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) "
+                "VALUES (%s, %s, NOW() + make_interval(mins => %s))",
+                (user["id"], token_hash, RESET_TOKEN_TTL_MINUTES),
+            )
+            conn.commit()
+            send_reset_email(email, raw_token)  # best-effort, after commit
+        cur.close()
+        conn.close()
+    except Exception as e:
+        logger.error("request_reset failed: %s", e)
+        # Still respond generically — don't leak internal state.
+        return jsonify(_RESET_GENERIC_MSG), 200
+    return jsonify(_RESET_GENERIC_MSG), 200
+
+
+@app.route("/api/auth/reset-password", methods=["POST"])
+@limiter.limit("5 per minute; 20 per hour", key_func=_client_ip)
+def reset_password():
+    """Complete a password reset: verify token, set new password, evict sessions."""
+    if not DATABASE_URL:
+        return jsonify({"error": "Database not configured"}), 503
+    data = request.get_json(silent=True) or {}
+    raw_token = (data.get("token") or "").strip()
+    new_password = data.get("password") or ""
+    if not raw_token or not new_password:
+        return jsonify({"error": "token and password are required"}), 400
+    token_hash = _hash_reset_token(raw_token)
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "SELECT prt.id AS token_id, prt.used_at, (NOW() > prt.expires_at) AS is_expired, "
+            "u.id AS user_id, u.username, u.email "
+            "FROM password_reset_tokens prt JOIN users u ON u.id = prt.user_id "
+            "WHERE prt.token_hash = %s",
+            (token_hash,),
+        )
+        row = cur.fetchone()
+        if not row or row["used_at"] is not None or row["is_expired"]:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Invalid or expired reset token"}), 400
+
+        pw_error = validate_new_password(
+            new_password, username=row["username"] or "", email=row["email"] or ""
+        )
+        if pw_error:
+            cur.close()
+            conn.close()
+            return jsonify({"error": pw_error}), 400
+
+        password_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+        cutoff = int(time.time())
+        cur.execute(
+            "UPDATE users SET password_hash = %s, sessions_valid_after = %s WHERE id = %s",
+            (password_hash, cutoff, row["user_id"]),
+        )
+        # Consume this token and invalidate any other outstanding ones.
+        cur.execute(
+            "UPDATE password_reset_tokens SET used_at = NOW() "
+            "WHERE user_id = %s AND used_at IS NULL",
+            (row["user_id"],),
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        logger.error("reset_password failed: %s", e)
+        return jsonify({"error": "Could not reset password"}), 500
+    return jsonify({"msg": "Password updated. Please log in with your new password."}), 200
 
 
 # ─── Portfolio routes ─────────────────────────────────────────────────────────

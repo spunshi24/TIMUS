@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Copy, Check, ExternalLink } from "lucide-react";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, authFetch } from "@/lib/api";
 import type { AuthUser } from "@/context/AuthContext";
 
 type GameRoomView = "idle" | "create" | "join";
@@ -209,7 +209,7 @@ const GameRoomPanel = ({ user, token, onAuthClick }: GameRoomPanelProps) => {
     }
     setCreateLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/gameroom/create`, {
+      const res = await authFetch(`${API_BASE}/api/gameroom/create`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -241,7 +241,7 @@ const GameRoomPanel = ({ user, token, onAuthClick }: GameRoomPanelProps) => {
     }
     setJoinLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/gameroom/join`, {
+      const res = await authFetch(`${API_BASE}/api/gameroom/join`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

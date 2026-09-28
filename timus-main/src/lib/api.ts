@@ -2,6 +2,34 @@
 // In production (GitHub Pages), VITE_API_URL is set to the hosted Render backend URL.
 export const API_BASE = (import.meta.env.VITE_API_URL as string) || "";
 
+// ─── Session-expiry handling ────────────────────────────────────────────────
+// AuthContext registers a handler here so any authenticated request that comes
+// back 401 (token expired, revoked via logout, or rejected after a secret
+// rotation) forces a client-side logout + re-auth prompt instead of leaving the
+// UI stuck on silently-failing calls.
+let unauthorizedHandler: (() => void) | null = null;
+
+export function setUnauthorizedHandler(fn: (() => void) | null): void {
+  unauthorizedHandler = fn;
+}
+
+/**
+ * fetch() wrapper for requests that carry a session token. On a 401 it invokes
+ * the registered unauthorized handler (clear session + open the login modal),
+ * then returns the response so callers keep their existing error handling.
+ * Use plain fetch() for public endpoints and for the auth endpoints themselves.
+ */
+export async function authFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const res = await fetch(input, init);
+  if (res.status === 401) {
+    unauthorizedHandler?.();
+  }
+  return res;
+}
+
 export interface Quote {
   ticker: string;
   name: string;

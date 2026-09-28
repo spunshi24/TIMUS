@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Plus, X, Loader2, Search, ChevronDown, ChevronUp, Check } from "lucide-react";
-import { API_BASE, fetchQuotes } from "@/lib/api";
+import { API_BASE, authFetch, fetchQuotes } from "@/lib/api";
 import type { AuthUser } from "@/context/AuthContext";
 
 interface StockItem {
@@ -120,7 +120,7 @@ const CustomWatchlistPanel = ({ user, token, onSelectTicker }: CustomWatchlistPa
     if (!token) return;
     setListLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/watchlist`, {
+      const res = await authFetch(`${API_BASE}/api/watchlist`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return;
@@ -221,7 +221,7 @@ const CustomWatchlistPanel = ({ user, token, onSelectTicker }: CustomWatchlistPa
     if (!token) return;
     setActionState((prev) => ({ ...prev, [ticker]: "adding" }));
     try {
-      const res = await fetch(`${API_BASE}/api/watchlist/add`, {
+      const res = await authFetch(`${API_BASE}/api/watchlist/add`, {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify({ ticker, name }),
@@ -247,7 +247,7 @@ const CustomWatchlistPanel = ({ user, token, onSelectTicker }: CustomWatchlistPa
     if (!token) return;
     setActionState((prev) => ({ ...prev, [ticker]: "removing" }));
     try {
-      const res = await fetch(`${API_BASE}/api/watchlist/remove`, {
+      const res = await authFetch(`${API_BASE}/api/watchlist/remove`, {
         method: "DELETE",
         headers: authHeaders(),
         body: JSON.stringify({ ticker }),

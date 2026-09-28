@@ -11,7 +11,7 @@ import CustomWatchlistPanel from "@/components/simulator/CustomWatchlistPanel";
 import StockPositionsPanel from "@/components/simulator/StockPositionsPanel";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
-import { API_BASE, fetchQuotes } from "@/lib/api";
+import { API_BASE, authFetch, fetchQuotes } from "@/lib/api";
 import { mergeOrders } from "@/lib/mergeOrders";
 
 export interface Position {
@@ -247,7 +247,7 @@ const Simulator = () => {
   ) => {
     if (!token) return;
     try {
-      await fetch(`${API_BASE}/api/portfolio/save`, {
+      await authFetch(`${API_BASE}/api/portfolio/save`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -273,7 +273,7 @@ const Simulator = () => {
   const loadPortfolioFromBackend = useCallback(async () => {
     if (!token) return;
     try {
-      const res = await fetch(`${API_BASE}/api/portfolio/load`, {
+      const res = await authFetch(`${API_BASE}/api/portfolio/load`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return;
