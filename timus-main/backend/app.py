@@ -988,6 +988,9 @@ def send_reset_email(to_email: str, raw_token: str) -> None:
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
+            # Resend (error 1010) blocks requests with a missing/default UA
+            # before they reach the API; send an explicit identifier.
+            "User-Agent": "TiMUS-backend/1.0",
         },
         method="POST",
     )
