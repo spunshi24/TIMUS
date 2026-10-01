@@ -959,6 +959,7 @@ def send_reset_email(to_email: str, raw_token: str) -> None:
     """Send the reset link via Resend. Best-effort: logs and returns on failure
     (the caller always responds generically regardless)."""
     import urllib.request
+    import urllib.error
 
     reset_url = f"{FRONTEND_URL}/reset-password?token={raw_token}"
     api_key = os.environ.get("RESEND_API_KEY")
@@ -993,6 +994,15 @@ def send_reset_email(to_email: str, raw_token: str) -> None:
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
             resp.read()
+    except urllib.error.HTTPError as e:
+        # HTTPError is itself a file-like response object. Logging e alone only
+        # yields the status line (e.g. "HTTP Error 403: Forbidden"); the body
+        # carries Resend's actual rejection message, so surface it too.
+        try:
+            detail = e.read().decode("utf-8", "replace")
+        except Exception:
+            detail = "<unreadable response body>"
+        logger.error("Resend send failed for reset email: %s — response: %s", e, detail)
     except Exception as e:
         logger.error("Resend send failed for reset email: %s", e)
 
