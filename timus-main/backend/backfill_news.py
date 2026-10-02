@@ -10,11 +10,15 @@ Needs DATABASE_URL and FINNHUB_API_KEY in the environment. Each edition is
 """
 from __future__ import annotations
 
+import os
 import sys
 import time
 from datetime import date, timedelta
 
-import app
+# A one-off run must not also start the server's daily scheduler thread
+os.environ["NEWS_SCHEDULER"] = "off"
+
+import app  # noqa: E402
 
 MAX_DAYS = 365  # Finnhub's free tier covers one year of company news
 
