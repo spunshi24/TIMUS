@@ -64,3 +64,98 @@ export async function fetchQuotes(tickers: string[]): Promise<Record<string, Quo
   }
   return out;
 }
+
+// ─── Research & News (Section G) ────────────────────────────────────────────
+// Public endpoints (no auth). One stored edition per ET calendar day.
+
+export interface NewsArticle {
+  id: number | string;
+  ticker: string | null;
+  headline: string;
+  source: string | null;
+  url: string;
+  summary: string | null;
+  image: string | null;
+  published_at: string | null;
+}
+
+export interface NewsSection {
+  featured: NewsArticle[];
+  more: NewsArticle[];
+}
+
+export interface NewsEdition {
+  date: string;
+  status: "ready";
+  lede: NewsArticle | null;
+  top: NewsArticle[];
+  sections: Record<string, NewsSection>;
+  built_at: string | null;
+}
+
+export type NewsEditionResult =
+  | { kind: "ready"; edition: NewsEdition }
+  | { kind: "building"; latest: string | null }
+  | { kind: "unavailable"; latest: string | null }
+  | { kind: "notFound" }
+  | { kind: "error" };
+
+export interface NewsSector {
+  name: string;
+  tickers: string[];
+}
+
+export interface NewsSearchResponse {
+  query: string;
+  kind: "ticker" | "keyword";
+  results: NewsArticle[];
+}
+
+/** Dates (YYYY-MM-DD) that have a ready edition, newest first. [] on failure. */
+export async function fetchNewsEditions(): Promise<string[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/news/editions`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.dates) ? data.dates : [];
+  } catch {
+    return [];
+  }
+}
+
+/** One day's paper (today, ET, when date is omitted). Never throws. */
+export async function fetchNewsEdition(date?: string): Promise<NewsEditionResult> {
+  try {
+    const qs = date ? `?date=${encodeURIComponent(date)}` : "";
+    const res = await fetch(`${API_BASE}/api/news/edition${qs}`);
+    // 400 = malformed or future date: same reader-facing state as "no edition"
+    if (res.status === 404 || res.status === 400) return { kind: "notFound" };
+    if (!res.ok && res.status !== 202) return { kind: "error" };
+    const data = await res.json();
+    if (data.status === "ready") return { kind: "ready", edition: data as NewsEdition };
+    if (data.status === "building") return { kind: "building", latest: data.latest ?? null };
+    if (data.status === "unavailable") return { kind: "unavailable", latest: data.latest ?? null };
+    return { kind: "error" };
+  } catch {
+    return { kind: "error" };
+  }
+}
+
+/** Ticker or keyword news search. Throws on network/server error. */
+export async function searchNews(q: string): Promise<NewsSearchResponse> {
+  const res = await fetch(`${API_BASE}/api/news/search?q=${encodeURIComponent(q)}`);
+  if (!res.ok) throw new Error(`News search failed (${res.status})`);
+  return res.json();
+}
+
+/** Ordered sector universe shared with the backend. [] on failure. */
+export async function fetchNewsSectors(): Promise<NewsSector[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/news/sectors`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.sectors) ? data.sectors : [];
+  } catch {
+    return [];
+  }
+}
