@@ -1771,8 +1771,13 @@ class FinnhubAuthError(Exception):
     """Missing or rejected API key — no point making the remaining calls."""
 
 
+def _et_now() -> datetime:
+    """Current time in ET (one seam, so tests can pin the clock)."""
+    return datetime.now(ET)
+
+
 def _et_today() -> date:
-    return datetime.now(ET).date()
+    return _et_now().date()
 
 
 def _finnhub_get(path: str, params: dict) -> list:
@@ -2017,7 +2022,9 @@ def build_news_edition(edition_date: date) -> str:
 def _start_news_build(edition_date: date) -> None:
     def run():
         try:
-            build_news_edition(edition_date)
+            status = build_news_edition(edition_date)
+            if status == "ready" and edition_date == _et_today():
+                _news_catch_up(edition_date)
         except Exception as e:
             logger.error("news build %s crashed: %s", edition_date, e)
             try:
@@ -2034,6 +2041,100 @@ def _start_news_build(edition_date: date) -> None:
                 pass
 
     threading.Thread(target=run, daemon=True).start()
+
+
+# ─── Built-in daily scheduler ─────────────────────────────────────────────────
+# Builds today's paper after 09:30 ET with no visitor and no external cron.
+# The lazy build on visit and POST /api/news/build remain as fallbacks; the
+# atomic 'building' claim in build_news_edition prevents duplicate builds.
+NEWS_SCHEDULER_INTERVAL = 600                 # seconds between checks
+NEWS_SCHEDULER_AFTER = (9, 30)                # (hour, minute) ET
+NEWS_CATCHUP_DAYS = 7
+NEWS_CATCHUP_EARLIEST = date(2026, 10, 2)     # never backfill before launch
+_news_scheduler_started = False
+_news_catchup_lock = threading.Lock()
+
+
+def _news_ready_dates(dates: list[date]) -> set[date]:
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT edition_date FROM news_editions WHERE status = 'ready' AND edition_date = ANY(%s)",
+            (dates,),
+        )
+        return {row[0] for row in cur.fetchall()}
+    finally:
+        conn.close()
+
+
+def _news_catchup_dates(today: date) -> list[date]:
+    """The previous NEWS_CATCHUP_DAYS ET dates, newest first, not before launch."""
+    days = (today - timedelta(days=n) for n in range(1, NEWS_CATCHUP_DAYS + 1))
+    return [d for d in days if d >= NEWS_CATCHUP_EARLIEST]
+
+
+def _news_catch_up(today: date) -> None:
+    """After today's paper is ready, build any missing recent past editions,
+    one at a time. Skips if another catch-up is already running."""
+    if not _news_catchup_lock.acquire(blocking=False):
+        return
+    try:
+        candidates = _news_catchup_dates(today)
+        if not candidates:
+            return
+        ready = _news_ready_dates(candidates)
+        for d in candidates:
+            if d in ready:
+                continue
+            status = build_news_edition(d)
+            logger.info("news catch-up %s: %s", d, status)
+    finally:
+        _news_catchup_lock.release()
+
+
+def _news_scheduler_tick() -> None:
+    now = _et_now()
+    if (now.hour, now.minute) < NEWS_SCHEDULER_AFTER:
+        return
+    today = now.date()
+    if _news_ready_dates([today]):
+        return
+    status = build_news_edition(today)
+    logger.info("news scheduler: %s -> %s", today, status)
+    if status == "ready":
+        _news_catch_up(today)
+
+
+def _news_scheduler_loop() -> None:
+    while True:
+        try:
+            _news_scheduler_tick()
+        except Exception as e:
+            # Finnhub down, DB blip, ...: log and try again next interval.
+            # Builder/fetch errors never carry the request URL, so no key here.
+            logger.warning("news scheduler iteration failed: %s: %s", e.__class__.__name__, e)
+        time.sleep(NEWS_SCHEDULER_INTERVAL)
+
+
+def start_news_scheduler() -> None:
+    """Start the scheduler thread once per serving process."""
+    global _news_scheduler_started
+    if _news_scheduler_started:
+        return
+    if not (DATABASE_URL and os.environ.get("FINNHUB_API_KEY")):
+        return
+    # Opt-out for one-off scripts that import this module (backfill_news.py)
+    if os.environ.get("NEWS_SCHEDULER", "").lower() == "off":
+        return
+    # Under the Flask debug reloader the parent process only watches files;
+    # start in the serving child (WERKZEUG_RUN_MAIN=true) so it runs once.
+    if (os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+            and os.environ.get("WERKZEUG_RUN_MAIN") != "true"):
+        return
+    _news_scheduler_started = True
+    threading.Thread(target=_news_scheduler_loop, daemon=True, name="news-scheduler").start()
+    logger.info("news scheduler started (daily after 09:30 ET, 7-day catch-up)")
 
 
 def _news_article_json(row: dict) -> dict:
@@ -2286,6 +2387,7 @@ def news_build():
 
 # ─── Startup ──────────────────────────────────────────────────────────────────
 init_db()
+start_news_scheduler()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
