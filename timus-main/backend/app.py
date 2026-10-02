@@ -12,7 +12,11 @@ import psycopg2.extras
 import bcrypt
 import json
 import secrets
-from datetime import timedelta
+import hmac
+import html
+import threading
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from flask_jwt_extended import (
     JWTManager, create_access_token,
     jwt_required, get_jwt_identity, get_jwt,
@@ -274,6 +278,34 @@ def init_db():
                     created_at TIMESTAMP DEFAULT NOW()
                 );
             """)
+            # Research & News: one stored edition per ET calendar day (Section G)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS news_editions (
+                    edition_date DATE PRIMARY KEY,
+                    status       TEXT NOT NULL,
+                    built_at     TIMESTAMPTZ DEFAULT NOW()
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS news_articles (
+                    id           SERIAL PRIMARY KEY,
+                    edition_date DATE NOT NULL REFERENCES news_editions(edition_date) ON DELETE CASCADE,
+                    sector       TEXT NOT NULL,
+                    ticker       TEXT,
+                    related      TEXT,
+                    headline     TEXT NOT NULL,
+                    source       TEXT,
+                    url          TEXT NOT NULL,
+                    summary      TEXT,
+                    image        TEXT,
+                    published_at TIMESTAMPTZ,
+                    UNIQUE (edition_date, url)
+                );
+            """)
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS news_articles_edition_date_idx "
+                "ON news_articles (edition_date);"
+            )
             conn.commit()
             cur.close()
             conn.close()
@@ -1684,6 +1716,572 @@ def gameroom_details(code):
     except Exception as e:
         logger.error("gameroom_details %s: %s", code, e)
         return jsonify({"error": str(e)}), 500
+
+
+# ─── Research & News (Section G) ──────────────────────────────────────────────
+# Sector universe for the daily edition and the frontend heat map. Every ticker
+# is in TICKER_INDEX. "Markets" is a pseudo-sector holding Finnhub's
+# category=general headlines, so it has no tickers of its own.
+NEWS_MARKETS_SECTOR = "Markets"
+NEWS_SECTORS: OrderedDict[str, list[str]] = OrderedDict([
+    (NEWS_MARKETS_SECTOR,      []),
+    ("Technology",             ["AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMD"]),
+    ("Financials",             ["JPM", "BAC", "GS", "V", "SOFI"]),
+    ("Healthcare",             ["LLY", "UNH", "JNJ", "MRNA", "PFE"]),
+    ("Consumer",               ["AMZN", "TSLA", "WMT", "COST", "NKE"]),
+    ("Energy & Industrials",   ["XOM", "CVX", "CAT", "BA", "GE"]),
+    ("Communication & Media",  ["NFLX", "DIS", "T", "VZ"]),
+])
+
+
+@app.route("/api/news/sectors")
+def news_sectors():
+    """Ordered sector list (a JSON list, since jsonify sorts object keys)."""
+    return jsonify({
+        "sectors": [{"name": name, "tickers": tickers} for name, tickers in NEWS_SECTORS.items()],
+    })
+
+
+# Build once, store, serve to everyone: one edition per ET calendar day lives
+# in Postgres, so Finnhub usage stays flat however many people read the paper.
+ET = ZoneInfo("America/New_York")
+FINNHUB_BASE = "https://finnhub.io/api/v1"
+NEWS_HTTP_TIMEOUT = 10            # seconds, per Finnhub call
+NEWS_CALL_SPACING = 1.1           # seconds between calls (free tier: 60/min)
+NEWS_EDITION_HOUR = 6             # today's edition builds lazily after 06:00 ET
+NEWS_WINDOW_HOURS = 36            # articles kept: 36h ending at end-of-day ET
+NEWS_PER_SECTOR = 8
+NEWS_FEATURED_PER_SECTOR = 4
+NEWS_TOP_STORIES = 4
+NEWS_MIN_ARTICLES = 5             # fewer than this stored → edition 'failed'
+NEWS_SUMMARY_MAX = 280
+NEWS_STALE_BUILD = timedelta(minutes=10)
+NEWS_FAILED_RETRY = timedelta(minutes=15)
+NEWS_EDITIONS_CACHE_TTL = 60
+NEWS_READY_CACHE_TTL = 300        # a ready edition never changes
+NEWS_SEARCH_CACHE_TTL = 900       # per-ticker search results
+NEWS_SEARCH_DAYS = 7
+NEWS_KEYWORD_DAYS = 90
+
+_NEWS_TAG_RE = re.compile(r"<[^>]*>")
+_NEWS_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+class FinnhubAuthError(Exception):
+    """Missing or rejected API key — no point making the remaining calls."""
+
+
+def _et_today() -> date:
+    return datetime.now(ET).date()
+
+
+def _finnhub_get(path: str, params: dict) -> list:
+    """GET a Finnhub endpoint that returns a JSON list. Never logs the key:
+    errors are re-raised without the request URL."""
+    import urllib.parse
+    import urllib.request
+    import urllib.error
+
+    key = os.environ.get("FINNHUB_API_KEY")
+    if not key:
+        raise FinnhubAuthError("FINNHUB_API_KEY not set")
+    qs = urllib.parse.urlencode({**params, "token": key})
+    req = urllib.request.Request(
+        f"{FINNHUB_BASE}{path}?{qs}",
+        headers={"User-Agent": "TiMUS-backend/1.0"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=NEWS_HTTP_TIMEOUT) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            raise FinnhubAuthError(f"Finnhub rejected the API key (HTTP {e.code})") from None
+        raise RuntimeError(f"Finnhub HTTP {e.code}") from None
+    except Exception as e:
+        raise RuntimeError(f"Finnhub request failed: {e.__class__.__name__}") from None
+    if not isinstance(data, list):
+        raise RuntimeError("Finnhub returned an unexpected payload")
+    return data
+
+
+def _http_url(value) -> str | None:
+    """Return value if it's an absolute http(s) URL, else None."""
+    from urllib.parse import urlparse
+
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    try:
+        parsed = urlparse(value)
+    except ValueError:
+        return None
+    return value if parsed.scheme in ("http", "https") and parsed.netloc else None
+
+
+def _strip_html(text) -> str:
+    if not isinstance(text, str):
+        return ""
+    # Strip, unescape, strip again so entity-encoded tags (&lt;b&gt;) go too.
+    text = _NEWS_TAG_RE.sub(" ", html.unescape(_NEWS_TAG_RE.sub(" ", text)))
+    return " ".join(text.split())
+
+
+def _truncate_summary(text: str) -> str:
+    """Cap at NEWS_SUMMARY_MAX chars (ellipsis included) on a word boundary."""
+    if len(text) <= NEWS_SUMMARY_MAX:
+        return text
+    cut = text[: NEWS_SUMMARY_MAX - 1]
+    space = cut.rfind(" ")
+    if space > NEWS_SUMMARY_MAX // 2:
+        cut = cut[:space]
+    return cut.rstrip(" ,;:.-") + "…"
+
+
+def _split_related(related) -> set[str]:
+    if not isinstance(related, str):
+        return set()
+    return {r.strip().upper() for r in related.split(",") if r.strip()}
+
+
+def _clean_finnhub_item(item: dict) -> dict | None:
+    """Normalise one Finnhub article, or None if it's unusable."""
+    headline = _strip_html(item.get("headline"))
+    url = _http_url(item.get("url"))
+    if not headline or not url:
+        return None
+    try:
+        published = datetime.fromtimestamp(int(item.get("datetime")), timezone.utc)
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
+    return {
+        "headline": headline,
+        "url": url,
+        "source": _strip_html(item.get("source")) or None,
+        "summary": _truncate_summary(_strip_html(item.get("summary"))) or None,
+        "image": _http_url(item.get("image")),
+        "related": _split_related(item.get("related")),
+        "published_at": published,
+    }
+
+
+def build_news_edition(edition_date: date) -> str:
+    """Build and store the edition for one ET calendar day.
+
+    Safe to call concurrently: the edition row is claimed atomically, so only
+    one builder runs per date. Returns a short outcome string.
+    """
+    if not DATABASE_URL:
+        return "no database"
+    started = time.time()
+
+    # 1. Claim the build
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO news_editions (edition_date, status) VALUES (%s, 'building') "
+            "ON CONFLICT DO NOTHING",
+            (edition_date,),
+        )
+        if cur.rowcount == 0:
+            cur.execute(
+                "SELECT status, built_at FROM news_editions WHERE edition_date = %s FOR UPDATE",
+                (edition_date,),
+            )
+            status, built_at = cur.fetchone()
+            age = datetime.now(timezone.utc) - built_at
+            if status == "ready":
+                conn.rollback()
+                return "already ready"
+            if status == "building" and age < NEWS_STALE_BUILD:
+                conn.rollback()
+                return "already building"
+            if status == "failed" and age < NEWS_FAILED_RETRY:
+                conn.rollback()
+                return "failed recently"
+            cur.execute(
+                "UPDATE news_editions SET status = 'building', built_at = NOW() "
+                "WHERE edition_date = %s",
+                (edition_date,),
+            )
+        conn.commit()
+        cur.close()
+    finally:
+        conn.close()
+
+    # 2. Fetch — general feed first, then company news per ticker in sector order
+    window_end = datetime.combine(edition_date + timedelta(days=1), datetime.min.time(), ET)
+    window_start = window_end - timedelta(hours=NEWS_WINDOW_HOURS)
+    frm, to = (edition_date - timedelta(days=1)).isoformat(), edition_date.isoformat()
+    fetches = [(NEWS_MARKETS_SECTOR, None, "/news", {"category": "general"})]
+    for sector, tickers in NEWS_SECTORS.items():
+        for t in tickers:
+            fetches.append((sector, t, "/company-news", {"symbol": t, "from": frm, "to": to}))
+
+    by_url: dict[str, dict] = {}   # insertion order = first sector fetched under
+    calls = errors = 0
+    aborted = None if os.environ.get("FINNHUB_API_KEY") else "FINNHUB_API_KEY not set"
+    for i, (sector, ticker, path, params) in enumerate([] if aborted else fetches):
+        if i:
+            time.sleep(NEWS_CALL_SPACING)
+        calls += 1
+        try:
+            items = _finnhub_get(path, params)
+        except FinnhubAuthError as e:
+            aborted = str(e)
+            break
+        except Exception as e:
+            errors += 1
+            logger.warning("news build %s: %s %s failed: %s", edition_date, path, ticker or "", e)
+            continue
+        for raw in items:
+            if not isinstance(raw, dict):
+                continue
+            art = _clean_finnhub_item(raw)
+            if art is None or not (window_start <= art["published_at"] < window_end):
+                continue
+            # 3. Dedupe by URL: keep the first sector, but merge coverage so the
+            # front-page ranking sees every ticker the story ran under.
+            existing = by_url.get(art["url"])
+            if existing is not None:
+                existing["related"] |= art["related"]
+                if ticker:
+                    existing["related"].add(ticker)
+                continue
+            if ticker:
+                art["related"].add(ticker)
+            art["sector"], art["ticker"] = sector, ticker
+            by_url[art["url"]] = art
+
+    per_sector: dict[str, list[dict]] = {s: [] for s in NEWS_SECTORS}
+    for art in by_url.values():
+        per_sector[art["sector"]].append(art)
+    for sector in per_sector:
+        per_sector[sector].sort(key=lambda a: a["published_at"], reverse=True)
+        per_sector[sector] = per_sector[sector][:NEWS_PER_SECTOR]
+    total = sum(len(v) for v in per_sector.values())
+
+    # 4. Store, then mark ready/failed
+    status = "ready" if total >= NEWS_MIN_ARTICLES and not aborted else "failed"
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        # A retried build replaces anything a previous attempt left behind
+        cur.execute("DELETE FROM news_articles WHERE edition_date = %s", (edition_date,))
+        if status == "ready":
+            rows = [
+                (edition_date, a["sector"], a["ticker"], ",".join(sorted(a["related"])) or None,
+                 a["headline"], a["source"], a["url"], a["summary"], a["image"], a["published_at"])
+                for arts in per_sector.values() for a in arts
+            ]
+            psycopg2.extras.execute_values(
+                cur,
+                "INSERT INTO news_articles (edition_date, sector, ticker, related, headline, "
+                "source, url, summary, image, published_at) VALUES %s "
+                "ON CONFLICT (edition_date, url) DO NOTHING",
+                rows,
+            )
+        cur.execute(
+            "UPDATE news_editions SET status = %s, built_at = NOW() WHERE edition_date = %s",
+            (status, edition_date),
+        )
+        conn.commit()
+        cur.close()
+    except Exception as e:
+        conn.rollback()
+        logger.error("news build %s: storing failed: %s", edition_date, e)
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE news_editions SET status = 'failed', built_at = NOW() WHERE edition_date = %s",
+                (edition_date,),
+            )
+            conn.commit()
+        except Exception:
+            pass
+        status = "failed"
+    finally:
+        conn.close()
+    _cache.pop("news:editions", None)
+
+    # 5. One summary line (never the key)
+    counts = ", ".join(f"{s}={len(v)}" for s, v in per_sector.items())
+    logger.info(
+        "news build %s: status=%s articles=%d [%s] calls=%d errors=%d duration=%.1fs%s",
+        edition_date, status, total, counts, calls, errors, time.time() - started,
+        f" aborted=({aborted})" if aborted else "",
+    )
+    return status
+
+
+def _start_news_build(edition_date: date) -> None:
+    def run():
+        try:
+            build_news_edition(edition_date)
+        except Exception as e:
+            logger.error("news build %s crashed: %s", edition_date, e)
+            try:
+                conn = get_db()
+                cur = conn.cursor()
+                cur.execute(
+                    "UPDATE news_editions SET status = 'failed', built_at = NOW() "
+                    "WHERE edition_date = %s AND status = 'building'",
+                    (edition_date,),
+                )
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+def _news_article_json(row: dict) -> dict:
+    published = row.get("published_at")
+    return {
+        "id": row.get("id"),
+        "ticker": row.get("ticker"),
+        "headline": row.get("headline"),
+        "source": row.get("source"),
+        "url": row.get("url"),
+        "summary": row.get("summary"),
+        "image": row.get("image"),
+        "published_at": published.isoformat() if published else None,
+    }
+
+
+def _compose_front_page(rows: list[dict]) -> dict:
+    """Pick lede / top stories / sector columns with simple, explainable rules.
+
+    Rank = number of tickers in `related` (coverage), ties broken by newest.
+    """
+    def newest(a):
+        return a["published_at"] or datetime.min.replace(tzinfo=timezone.utc)
+
+    ranked = sorted(rows, key=lambda a: (len(_split_related(a["related"])), newest(a)), reverse=True)
+    lede = next((a for a in ranked if a["summary"]), None)
+    if lede is None:
+        markets = [a for a in rows if a["sector"] == NEWS_MARKETS_SECTOR]
+        lede = max(markets, key=newest) if markets else None
+    used = {lede["id"]} if lede else set()
+    top = [a for a in ranked if a["id"] not in used][:NEWS_TOP_STORIES]
+    used |= {a["id"] for a in top}
+
+    sections = {}
+    for sector in NEWS_SECTORS:
+        arts = sorted(
+            (a for a in rows if a["sector"] == sector and a["id"] not in used),
+            key=newest, reverse=True,
+        )
+        if arts:
+            sections[sector] = {
+                "featured": [_news_article_json(a) for a in arts[:NEWS_FEATURED_PER_SECTOR]],
+                "more": [_news_article_json(a) for a in arts[NEWS_FEATURED_PER_SECTOR:]],
+            }
+    return {
+        "lede": _news_article_json(lede) if lede else None,
+        "top": [_news_article_json(a) for a in top],
+        "sections": sections,
+    }
+
+
+def _latest_ready_edition(cur) -> str | None:
+    cur.execute("SELECT MAX(edition_date) AS d FROM news_editions WHERE status = 'ready'")
+    row = cur.fetchone()
+    return row["d"].isoformat() if row and row["d"] else None
+
+
+@app.route("/api/news/editions")
+def news_editions():
+    """Dates that have a ready edition, newest first (last 120)."""
+    cached = cache_get("news:editions")
+    if cached is not None:
+        return jsonify(cached)
+    if not DATABASE_URL:
+        return jsonify({"dates": []})
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT edition_date FROM news_editions WHERE status = 'ready' "
+            "ORDER BY edition_date DESC LIMIT 120"
+        )
+        result = {"dates": [r[0].isoformat() for r in cur.fetchall()]}
+        cur.close()
+        conn.close()
+    except Exception as e:
+        logger.error("news_editions: %s", e)
+        return jsonify({"error": "News is temporarily unavailable."}), 500
+    cache_set("news:editions", result, NEWS_EDITIONS_CACHE_TTL)
+    return jsonify(result)
+
+
+@app.route("/api/news/edition")
+def news_edition():
+    """One day's paper. Defaults to today (ET); builds today's lazily."""
+    today = _et_today()
+    raw = (request.args.get("date") or "").strip()
+    if raw:
+        try:
+            if not _NEWS_DATE_RE.match(raw):
+                raise ValueError
+            edition_date = date.fromisoformat(raw)
+        except ValueError:
+            return jsonify({"error": "Invalid date. Use YYYY-MM-DD."}), 400
+        if edition_date > today:
+            return jsonify({"error": "That edition hasn't been published yet."}), 400
+    else:
+        edition_date = today
+
+    cache_key = f"news:edition:{edition_date.isoformat()}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return jsonify(cached)
+    if not DATABASE_URL:
+        return jsonify({"error": "News is temporarily unavailable."}), 503
+
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "SELECT status, built_at FROM news_editions WHERE edition_date = %s",
+            (edition_date,),
+        )
+        edition = cur.fetchone()
+
+        if edition and edition["status"] == "ready":
+            cur.execute(
+                "SELECT id, sector, ticker, related, headline, source, url, summary, image, "
+                "published_at FROM news_articles WHERE edition_date = %s",
+                (edition_date,),
+            )
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+            result = {
+                "date": edition_date.isoformat(),
+                "status": "ready",
+                **_compose_front_page(rows),
+                "built_at": edition["built_at"].isoformat() if edition["built_at"] else None,
+            }
+            cache_set(cache_key, result, NEWS_READY_CACHE_TTL)
+            return jsonify(result)
+
+        latest = _latest_ready_edition(cur)
+        cur.close()
+        conn.close()
+    except Exception as e:
+        logger.error("news_edition %s: %s", edition_date, e)
+        return jsonify({"error": "News is temporarily unavailable."}), 500
+
+    if edition_date != today:
+        return jsonify({"error": "No edition for this date."}), 404
+
+    if datetime.now(ET).hour < NEWS_EDITION_HOUR:
+        return jsonify({"status": "unavailable", "latest": latest})
+
+    if edition:
+        age = datetime.now(timezone.utc) - edition["built_at"]
+        if edition["status"] == "failed" and age < NEWS_FAILED_RETRY:
+            return jsonify({"status": "unavailable", "latest": latest})
+        if edition["status"] == "building" and age < NEWS_STALE_BUILD:
+            return jsonify({"status": "building", "latest": latest}), 202
+
+    _start_news_build(edition_date)
+    return jsonify({"status": "building", "latest": latest}), 202
+
+
+def _search_ticker_news(ticker: str) -> list[dict]:
+    """Last NEWS_SEARCH_DAYS of company news for one ticker, newest first."""
+    today = _et_today()
+    try:
+        items = _finnhub_get("/company-news", {
+            "symbol": ticker,
+            "from": (today - timedelta(days=NEWS_SEARCH_DAYS)).isoformat(),
+            "to": today.isoformat(),
+        })
+        arts = [a for a in (_clean_finnhub_item(i) for i in items if isinstance(i, dict)) if a]
+        arts = [
+            {**a, "id": f"fh-{i}", "ticker": ticker} for i, a in enumerate(arts)
+        ]
+    except Exception as e:
+        logger.warning("news search %s: Finnhub failed (%s), falling back to yfinance", ticker, e)
+        arts = []
+        for i, item in enumerate(yf.Search(ticker, news_count=20).news or []):
+            headline = _strip_html(item.get("title"))
+            url = _http_url(item.get("link"))
+            try:
+                published = datetime.fromtimestamp(int(item.get("providerPublishTime")), timezone.utc)
+            except (TypeError, ValueError, OverflowError, OSError):
+                published = None
+            if not headline or not url:
+                continue
+            arts.append({
+                "id": f"yf-{i}", "ticker": ticker, "headline": headline, "url": url,
+                "source": _strip_html(item.get("publisher")) or None,
+                "summary": None, "image": None, "published_at": published,
+            })
+    arts.sort(key=lambda a: a["published_at"] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    return [_news_article_json(a) for a in arts[:20]]
+
+
+@app.route("/api/news/search")
+@limiter.limit("30 per minute", key_func=_client_ip)
+def news_search():
+    q = (request.args.get("q") or "").strip()[:60]
+    if not q:
+        return jsonify({"query": "", "kind": "keyword", "results": []})
+
+    ticker = q.upper()
+    if ticker in TICKER_INDEX:
+        cache_key = f"news:search:{ticker}"
+        results = cache_get(cache_key)
+        if results is None:
+            try:
+                results = _search_ticker_news(ticker)
+            except Exception as e:
+                logger.error("news search %s: %s", ticker, e)
+                return jsonify({"query": q, "kind": "ticker", "results": []})
+            cache_set(cache_key, results, NEWS_SEARCH_CACHE_TTL)
+        return jsonify({"query": q, "kind": "ticker", "results": results})
+
+    if not DATABASE_URL:
+        return jsonify({"query": q, "kind": "keyword", "results": []})
+    # Parameterized ILIKE; escape the pattern's own wildcards so they match literally
+    pattern = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+    since = _et_today() - timedelta(days=NEWS_KEYWORD_DAYS)
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        # The 36h window overlaps consecutive editions, so dedupe by URL
+        cur.execute("""
+            SELECT * FROM (
+                SELECT DISTINCT ON (url) id, ticker, headline, source, url, summary, image, published_at
+                FROM news_articles
+                WHERE edition_date >= %s AND headline ILIKE %s
+                ORDER BY url, edition_date DESC
+            ) hits
+            ORDER BY published_at DESC NULLS LAST
+            LIMIT 30
+        """, (since, pattern))
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        logger.error("news search keyword: %s", e)
+        return jsonify({"error": "News is temporarily unavailable."}), 500
+    return jsonify({"query": q, "kind": "keyword", "results": [_news_article_json(r) for r in rows]})
+
+
+@app.route("/api/news/build", methods=["POST"])
+def news_build():
+    """Optional warm-up ping (e.g. a daily Apps Script at ~9:45 ET)."""
+    expected = os.environ.get("NEWS_CRON_SECRET", "")
+    provided = request.headers.get("X-Cron-Secret", "")
+    if not expected or not hmac.compare_digest(provided.encode("utf-8"), expected.encode("utf-8")):
+        return jsonify({"error": "Forbidden"}), 403
+    _start_news_build(_et_today())
+    return jsonify({"status": "building"}), 202
 
 
 # ─── Startup ──────────────────────────────────────────────────────────────────
