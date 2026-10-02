@@ -1686,6 +1686,30 @@ def gameroom_details(code):
         return jsonify({"error": str(e)}), 500
 
 
+# ─── Research & News (Section G) ──────────────────────────────────────────────
+# Sector universe for the daily edition and the frontend heat map. Every ticker
+# is in TICKER_INDEX. "Markets" is a pseudo-sector holding Finnhub's
+# category=general headlines, so it has no tickers of its own.
+NEWS_MARKETS_SECTOR = "Markets"
+NEWS_SECTORS: OrderedDict[str, list[str]] = OrderedDict([
+    (NEWS_MARKETS_SECTOR,      []),
+    ("Technology",             ["AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMD"]),
+    ("Financials",             ["JPM", "BAC", "GS", "V", "SOFI"]),
+    ("Healthcare",             ["LLY", "UNH", "JNJ", "MRNA", "PFE"]),
+    ("Consumer",               ["AMZN", "TSLA", "WMT", "COST", "NKE"]),
+    ("Energy & Industrials",   ["XOM", "CVX", "CAT", "BA", "GE"]),
+    ("Communication & Media",  ["NFLX", "DIS", "T", "VZ"]),
+])
+
+
+@app.route("/api/news/sectors")
+def news_sectors():
+    """Ordered sector list (a JSON list, since jsonify sorts object keys)."""
+    return jsonify({
+        "sectors": [{"name": name, "tickers": tickers} for name, tickers in NEWS_SECTORS.items()],
+    })
+
+
 # ─── Startup ──────────────────────────────────────────────────────────────────
 init_db()
 
