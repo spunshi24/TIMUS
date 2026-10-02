@@ -36,12 +36,9 @@ const Navigation = () => {
           <Link to="/simulator" className="hover:text-foreground transition-colors">
             Simulator
           </Link>
-          <button
-            onClick={() => scrollTo("for-educators")}
-            className="hover:text-foreground transition-colors"
-          >
-            For Educators
-          </button>
+          <Link to="/news" className="hover:text-foreground transition-colors">
+            News
+          </Link>
           <button
             onClick={() => scrollTo("education")}
             className="hover:text-foreground transition-colors"
@@ -51,9 +48,12 @@ const Navigation = () => {
           <Link to="/portfolio" className="hover:text-foreground transition-colors">
             Portfolio
           </Link>
-          <Link to="/news" className="hover:text-foreground transition-colors">
-            News
-          </Link>
+          <button
+            onClick={() => scrollTo("for-educators")}
+            className="hover:text-foreground transition-colors"
+          >
+            For Educators
+          </button>
         </div>
 
         {/* Right side: logged out → Sign In; logged in → icon cluster,
@@ -106,12 +106,13 @@ const Navigation = () => {
           >
             Simulator
           </Link>
-          <button
-            onClick={() => scrollTo("for-educators")}
-            className="block w-full text-left text-sm font-medium text-foreground py-2.5 border-b border-border/50"
+          <Link
+            to="/news"
+            onClick={() => setIsOpen(false)}
+            className="block text-sm font-medium text-foreground py-2.5 border-b border-border/50"
           >
-            For Educators
-          </button>
+            News
+          </Link>
           <button
             onClick={() => scrollTo("education")}
             className="block w-full text-left text-sm font-medium text-foreground py-2.5 border-b border-border/50"
@@ -125,13 +126,12 @@ const Navigation = () => {
           >
             Portfolio
           </Link>
-          <Link
-            to="/news"
-            onClick={() => setIsOpen(false)}
-            className="block text-sm font-medium text-foreground py-2.5 border-b border-border/50"
+          <button
+            onClick={() => scrollTo("for-educators")}
+            className="block w-full text-left text-sm font-medium text-foreground py-2.5 border-b border-border/50"
           >
-            News
-          </Link>
+            For Educators
+          </button>
           <Link
             to="/watchlist"
             onClick={() => setIsOpen(false)}

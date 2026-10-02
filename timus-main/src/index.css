@@ -233,6 +233,22 @@ All colors MUST be HSL.
   background-color: hsl(var(--success) / 0.4);
 }
 
+/* News masthead nameplate (approved exception: Noto Serif Display, masthead
+   only). Sized in container units so it fills the header box edge to edge. */
+.news-nameplate-box {
+  container-type: inline-size;
+}
+
+.news-nameplate {
+  font-family: "Noto Serif Display Variable", Georgia, serif;
+  font-weight: 800;
+  font-stretch: 62.5%;
+  font-size: 12.5cqi;   /* text is ~7.8em wide → fills the box edge to edge */
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: 0;
+}
+
 @keyframes glitch {
   0% {
     transform: translate(0);
