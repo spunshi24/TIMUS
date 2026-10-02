@@ -686,10 +686,10 @@ const Simulator = () => {
           onShowWatchlist={handleShowWatchlist}
         />
 
-        <div className="container mx-auto px-4 py-8 space-y-6">
+        <div className="container mx-auto px-3 sm:px-4 pt-4 pb-24 md:py-8 space-y-4 md:space-y-6">
           {selectedTicker ? (
-            <div className="space-y-6">
-              <div className="grid lg:grid-cols-3 gap-6">
+            <div className="space-y-4 md:space-y-6">
+              <div className="grid lg:grid-cols-3 gap-4 md:gap-6">
                 {/* Chart */}
                 <div className="lg:col-span-2">
                   <ChartPanel ticker={selectedTicker} onPriceUpdate={handlePriceUpdate} />
@@ -746,7 +746,7 @@ const Simulator = () => {
       {!turboOpen && (
         <button
           onClick={() => setTurboOpen(true)}
-          className="fixed bottom-6 right-6 z-30 flex items-center gap-2 px-5 py-3 rounded-full font-bold text-sm active:scale-95 transition-all text-white bg-yellow-500 hover:bg-yellow-400 shadow-[0_4px_24px_rgba(234,179,8,0.4)] dark:text-success-foreground dark:bg-success dark:hover:bg-success/90 dark:shadow-[0_4px_24px_rgba(34,197,94,0.35)]"
+          className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-30 flex items-center gap-2 px-5 py-3 rounded-full font-bold text-sm active:scale-95 transition-all text-white bg-yellow-500 hover:bg-yellow-400 shadow-[0_4px_24px_rgba(234,179,8,0.4)] dark:text-success-foreground dark:bg-success dark:hover:bg-success/90 dark:shadow-[0_4px_24px_rgba(34,197,94,0.35)]"
         >
           <Zap className="w-4 h-4" />
           Turbo

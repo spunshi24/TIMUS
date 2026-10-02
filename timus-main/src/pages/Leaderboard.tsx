@@ -93,11 +93,11 @@ const Leaderboard = () => {
           <table className="w-full">
             <thead>
               <tr className="text-muted-foreground text-xs uppercase tracking-wider border-b border-border">
-                <th className="text-left py-4 px-6 font-medium">Rank</th>
-                <th className="text-left py-4 px-6 font-medium">Player</th>
-                <th className="text-right py-4 px-6 font-medium">Return</th>
-                <th className="text-right py-4 px-6 font-medium">Equity</th>
-                <th className="w-12"></th>
+                <th className="text-left py-3 px-3 sm:py-4 sm:px-6 font-medium">Rank</th>
+                <th className="text-left py-3 px-3 sm:py-4 sm:px-6 font-medium">Player</th>
+                <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-medium">Return</th>
+                <th className="text-right py-3 px-3 sm:py-4 sm:px-6 font-medium">Equity</th>
+                <th className="w-8 sm:w-12"></th>
               </tr>
             </thead>
             <tbody>
@@ -106,27 +106,27 @@ const Leaderboard = () => {
                   key={e.user_id}
                   className="border-t border-border/50 hover:bg-muted/30 transition-colors"
                 >
-                  <td className="py-5 px-6 font-mono text-2xl text-muted-foreground font-bold">
+                  <td className="py-3 px-3 sm:py-5 sm:px-6 font-mono text-lg sm:text-2xl text-muted-foreground font-bold">
                     {String(e.rank).padStart(2, "0")}
                   </td>
-                  <td className="py-5 px-6 text-xl text-foreground font-semibold">
+                  <td className="py-3 px-3 sm:py-5 sm:px-6 text-base sm:text-xl text-foreground font-semibold break-all">
                     {e.username}
                   </td>
                   <td
-                    className={`py-5 px-6 text-right text-xl font-bold ${
+                    className={`py-3 px-3 sm:py-5 sm:px-6 text-right text-base sm:text-xl font-bold ${
                       e.return_pct >= 0 ? "text-success" : "text-destructive"
                     }`}
                   >
                     {e.return_pct >= 0 ? "+" : ""}
                     {e.return_pct.toFixed(2)}%
                   </td>
-                  <td className="py-5 px-6 text-right text-xl text-foreground/80">
+                  <td className="py-3 px-3 sm:py-5 sm:px-6 text-right text-base sm:text-xl text-foreground/80">
                     ${e.equity.toLocaleString(undefined, {
                       minimumFractionDigits: 0,
                       maximumFractionDigits: 0,
                     })}
                   </td>
-                  <td className="py-5 px-3 text-center text-lg">
+                  <td className="py-3 px-1 sm:py-5 sm:px-3 text-center text-sm sm:text-lg">
                     {e.direction === "up" ? (
                       <span className="text-success">▲</span>
                     ) : (

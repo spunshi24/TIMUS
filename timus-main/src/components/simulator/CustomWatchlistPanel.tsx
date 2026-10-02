@@ -274,7 +274,7 @@ const CustomWatchlistPanel = ({ user, token, onSelectTicker }: CustomWatchlistPa
     : top50.map((t) => ({ ...t, price: null, change_pct: null }));
 
   return (
-    <div className="p-6 rounded-lg border-2 border-border bg-card shadow-lg">
+    <div className="p-4 sm:p-6 rounded-lg border-2 border-border bg-card shadow-lg">
       {/* ── Section header ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-4">
         <div>

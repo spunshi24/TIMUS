@@ -281,7 +281,7 @@ const GameRoomPanel = ({ user, token, onAuthClick }: GameRoomPanelProps) => {
   // ── Active room view (leaderboard) ────────────────────────────────────
   if (activeRoom) {
     return (
-      <div className="p-6 rounded-lg border-2 border-border bg-card shadow-lg">
+      <div className="p-4 sm:p-6 rounded-lg border-2 border-border bg-card shadow-lg">
         <h3 className="text-2xl font-bold text-foreground mb-2">Game Room</h3>
 
         {/* Room code bar */}
@@ -356,7 +356,7 @@ const GameRoomPanel = ({ user, token, onAuthClick }: GameRoomPanelProps) => {
 
   // ── Default view (create/join) ────────────────────────────────────────
   return (
-    <div className="p-6 rounded-lg border-2 border-border bg-card shadow-lg">
+    <div className="p-4 sm:p-6 rounded-lg border-2 border-border bg-card shadow-lg">
       <h3 className="text-2xl font-bold text-foreground mb-2">Game Room</h3>
       <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
         Compete in a team-based friendly competition. Create a room or join one with a code.

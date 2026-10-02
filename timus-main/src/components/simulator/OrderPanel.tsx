@@ -88,7 +88,7 @@ const OrderPanel = ({ ticker, balance, currentPrice, onPlaceOrder }: OrderPanelP
   };
 
   return (
-    <div className="p-6 rounded-lg border-2 border-border bg-card shadow-lg sticky top-24">
+    <div className="p-4 sm:p-6 rounded-lg border-2 border-border bg-card shadow-lg lg:sticky lg:top-24">
       <h3 className="text-2xl font-bold text-foreground mb-1">Place Order</h3>
 
       {/* Current price ticker display */}

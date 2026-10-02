@@ -51,7 +51,7 @@ const WatchlistPanel = ({ selectedTicker, onSelectTicker }: WatchlistPanelProps)
   }, []);
 
   return (
-    <div className="p-6 rounded-lg border-2 border-border bg-card shadow-lg">
+    <div className="p-4 sm:p-6 rounded-lg border-2 border-border bg-card shadow-lg">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h3 className="text-xl font-bold text-foreground">Watchlist</h3>
@@ -70,7 +70,7 @@ const WatchlistPanel = ({ selectedTicker, onSelectTicker }: WatchlistPanelProps)
           <span>Fetching live prices…</span>
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
           {items.map((item) => {
             const isPositive = item.change_pct >= 0;
             const isSelected = item.ticker === selectedTicker;
@@ -78,7 +78,7 @@ const WatchlistPanel = ({ selectedTicker, onSelectTicker }: WatchlistPanelProps)
               <button
                 key={item.ticker}
                 onClick={() => onSelectTicker(item.ticker)}
-                className={`p-4 rounded-xl border-2 text-left transition-all hover:shadow-md active:scale-95 ${
+                className={`p-3 sm:p-4 rounded-xl border-2 text-left min-w-0 transition-all hover:shadow-md active:scale-95 ${
                   isSelected
                     ? "border-primary bg-primary/10"
                     : "border-border bg-muted/30 hover:bg-muted/60 hover:border-muted-foreground/40"
@@ -95,7 +95,7 @@ const WatchlistPanel = ({ selectedTicker, onSelectTicker }: WatchlistPanelProps)
                 <p className="text-xs text-muted-foreground truncate mb-2 leading-tight">
                   {item.name}
                 </p>
-                <p className="text-lg font-bold text-foreground">
+                <p className="text-base sm:text-lg font-bold text-foreground">
                   ${item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
                 <p
