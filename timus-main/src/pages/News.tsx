@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import "@fontsource-variable/noto-serif-display/wdth.css";
+import "@fontsource-variable/newsreader/opsz.css";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import AppShell from "@/components/shell/AppShell";
@@ -136,8 +136,8 @@ function StoryImage({ src }: { src: string | null }) {
 function Masthead({ dateIso }: { dateIso: string }) {
   return (
     <header className="mb-5">
-      <div className="news-nameplate-box border-y-[3px] border-double border-border py-3 sm:py-4 text-center">
-        <h1 className="news-nameplate text-foreground">THE TiMUS DAILY.</h1>
+      <div className="border-y-[3px] border-double border-border py-3 sm:py-4 text-center">
+        <h1 className="news-nameplate text-foreground text-[36px] sm:text-[52px] md:text-[68px] tracking-[-0.5px] sm:tracking-[-1px]">The TiMUS Daily</h1>
       </div>
       <div className="flex flex-col items-center gap-0.5 border-b border-border py-2 text-sm text-dim sm:flex-row sm:justify-between">
         <span className="fraunces">{formatEditionDate(dateIso, "long")}</span>
