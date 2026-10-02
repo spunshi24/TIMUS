@@ -22,13 +22,13 @@ import {
 
 // "The TiMUS Daily" (Section G): one stored, stocks-only edition per ET day.
 // Editorial look reuses EducationSection/Gameroom: .fraunces display text,
-// ink/dim/ered tokens, italic kicker labels and thin border-border rules.
+// ink/dim/ered tokens, upright kicker labels and thin border-border rules.
 
 const POLL_MS = 5_000;
 const POLL_MAX_MS = 120_000;
 const SEARCH_DEBOUNCE_MS = 400;
 
-const KICKER = "fraunces text-[11px] tracking-[2px] uppercase italic text-ered";
+const KICKER = "fraunces text-[12px] tracking-[2px] uppercase text-ered";
 
 // ─── Date helpers (editions are ET calendar days, "YYYY-MM-DD") ─────────────
 
@@ -136,14 +136,14 @@ function Masthead({ dateIso }: { dateIso: string }) {
   return (
     <header className="mb-5">
       <div className="border-y-[3px] border-double border-border py-3 sm:py-4 text-center">
-        <h1 className="fraunces text-[28px] md:text-[40px] font-medium tracking-tight leading-none text-ink">
+        <h1 className="text-4xl md:text-5xl font-bold leading-none text-foreground">
           The TiMUS Daily
         </h1>
       </div>
       <div className="flex flex-col items-center gap-0.5 border-b border-border py-2 text-xs text-dim sm:flex-row sm:justify-between">
-        <span className="fraunces italic">{formatEditionDate(dateIso, "long")}</span>
+        <span className="fraunces">{formatEditionDate(dateIso, "long")}</span>
         <span className="hidden sm:block fraunces uppercase tracking-[2px] text-[11px]">Markets edition</span>
-        <span className="fraunces italic">Stocks only</span>
+        <span className="fraunces">Stocks only</span>
       </div>
     </header>
   );
