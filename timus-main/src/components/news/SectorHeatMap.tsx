@@ -9,7 +9,7 @@ import { fetchQuotes, type NewsSector, type Quote } from "@/lib/api";
 
 const REFRESH_MS = 60_000;
 const LONG_PRESS_MS = 450;
-const KICKER = "fraunces text-[11px] tracking-[2px] uppercase italic text-ered";
+const KICKER = "fraunces text-[12px] tracking-[2px] uppercase text-ered";
 
 // Strong tiles: the light-theme *-foreground tokens are near-white, which
 // measures under 3:1 on an 80% tint, so light mode uses dark foreground text.
