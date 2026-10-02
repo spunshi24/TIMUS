@@ -222,6 +222,17 @@ All colors MUST be HSL.
   animation: shake 0.4s ease-in-out;
 }
 
+/* Sector heat map (News, G4): opacity steps of the existing --success token.
+   Tailwind's palette has no `success` entry (see .bg-success above), so these
+   mirror it, scoped to .heatmap so nothing else in the app changes. */
+.heatmap .bg-success\/80 {
+  background-color: hsl(var(--success) / 0.8);
+}
+
+.heatmap .bg-success\/40 {
+  background-color: hsl(var(--success) / 0.4);
+}
+
 @keyframes glitch {
   0% {
     transform: translate(0);

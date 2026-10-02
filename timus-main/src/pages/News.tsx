@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
+import SectorHeatMap from "@/components/news/SectorHeatMap";
 import {
   fetchNewsEdition,
   fetchNewsEditions,
@@ -476,6 +477,7 @@ const News = () => {
         return (
           <div className="space-y-10">
             <LedeBlock lede={lede} top={top} onTicker={openInSimulator} />
+            {isToday && <SectorHeatMap sectors={sectors} onOpenTicker={openInSimulator} />}
             {sectionOrder.length > 0 && (
               <div className="grid gap-x-10 gap-y-8 border-t border-border pt-8 md:grid-cols-2 lg:grid-cols-3">
                 {sectionOrder.map((name) => (
