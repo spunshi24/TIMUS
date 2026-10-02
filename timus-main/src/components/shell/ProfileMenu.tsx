@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/context/AuthContext";
+import { cn } from "@/lib/utils";
 
 interface PortfolioSummary {
   buyingPower: number;
@@ -57,6 +58,8 @@ interface ProfileMenuProps {
   direction?: "down" | "up";
   showLogout?: boolean;
   align?: "start" | "end";
+  /** Extra classes for the dropdown panel (e.g. a higher z-index inside a Sheet). */
+  contentClassName?: string;
 }
 
 // Profile dropdown: Buying Power / Stocks / Settled cash / P&L%, optional Log out.
@@ -66,6 +69,7 @@ export default function ProfileMenu({
   direction = "down",
   showLogout = true,
   align = "end",
+  contentClassName,
 }: ProfileMenuProps) {
   const { logout } = useAuth();
   const [summary, setSummary] = useState<PortfolioSummary>(readPortfolioSummary);
@@ -86,7 +90,7 @@ export default function ProfileMenu({
       <DropdownMenuContent
         side={direction === "up" ? "top" : "bottom"}
         align={align}
-        className="w-60"
+        className={cn("w-60", contentClassName)}
       >
         {rows.map((r) => (
           <div key={r.label} className="flex items-center justify-between px-2 py-1.5 text-sm">
