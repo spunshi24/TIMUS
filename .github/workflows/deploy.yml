@@ -21,18 +21,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          bun-version: latest
+          node-version: 20
+          cache: npm
+          cache-dependency-path: timus-main/package-lock.json
 
       - name: Install dependencies
         working-directory: timus-main
-        run: bun install
+        run: npm ci
 
       - name: Build
         working-directory: timus-main
-        run: bun run build
+        run: npm run build
         env:
           NODE_ENV: production
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
