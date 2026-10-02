@@ -11,14 +11,20 @@ const NAV_ITEMS = [
   { to: "/gameroom", label: "Gameroom", icon: Trophy },
 ];
 
-// Collapsible left sidebar for the logged-in shell (C5).
-// When open, the top bar's right-side icon cluster hides — the same controls
-// live at the bottom of this sidebar instead.
-export default function AppSidebar() {
+interface SidebarContentProps {
+  /** Called after any nav link is clicked and after Sign Out — the mobile
+      drawer uses it to close itself. Omitted on the desktop sidebar. */
+  onNavigate?: () => void;
+}
+
+// Sidebar body shared by the desktop <aside> and the mobile drawer (AppShell).
+export function SidebarContent({ onNavigate }: SidebarContentProps) {
   const { user, logout } = useAuth();
+  // Inside the drawer (a z-50 Sheet), lift the profile dropdown above it.
+  const inDrawer = !!onNavigate;
 
   return (
-    <aside className="fixed left-0 top-16 bottom-0 z-40 w-60 hidden md:flex flex-col bg-sidebar border-r border-sidebar-border">
+    <>
       {/* Nav items — the sidebar toggle lives in AppShell's bar, the single
           always-reachable control on every page (F3/F4) */}
       <nav className="flex-1 px-3 py-4 space-y-1">
@@ -26,6 +32,7 @@ export default function AppSidebar() {
           <NavLink
             key={to}
             to={to}
+            onClick={onNavigate}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive
@@ -46,6 +53,7 @@ export default function AppSidebar() {
           direction="up"
           align="start"
           showLogout={false}
+          contentClassName={inDrawer ? "z-[60]" : undefined}
           trigger={
             <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-foreground hover:bg-sidebar-accent/60 transition-colors">
               <UserCircle2 className="w-4 h-4 shrink-0 text-muted-foreground" />
@@ -54,13 +62,27 @@ export default function AppSidebar() {
           }
         />
         <button
-          onClick={logout}
+          onClick={() => {
+            logout();
+            onNavigate?.();
+          }}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-destructive hover:bg-sidebar-accent/60 transition-colors"
         >
           <LogOut className="w-4 h-4 shrink-0" />
           Sign Out
         </button>
       </div>
+    </>
+  );
+}
+
+// Collapsible left sidebar for the logged-in shell (C5).
+// When open, the top bar's right-side icon cluster hides — the same controls
+// live at the bottom of this sidebar instead.
+export default function AppSidebar() {
+  return (
+    <aside className="fixed left-0 top-16 bottom-0 z-40 w-60 hidden md:flex flex-col bg-sidebar border-r border-sidebar-border">
+      <SidebarContent />
     </aside>
   );
 }
