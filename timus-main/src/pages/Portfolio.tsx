@@ -200,12 +200,12 @@ const Portfolio = () => {
   return (
     <AppShell title="Portfolio">
       <div>
-        <div className="container mx-auto px-4 py-10">
+        <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-10">
 
           {/* ── Page header ──────────────────────────────────────────────── */}
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6 sm:mb-8">
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground break-words">
                 {user ? `${user.username} — Portfolio` : "Portfolio"}
               </h1>
               {lastUpdated && (
@@ -229,7 +229,7 @@ const Portfolio = () => {
           </div>
 
           {/* ── Summary cards ─────────────────────────────────────────────── */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
             {[
               {
                 label: "Portfolio Value",
@@ -264,7 +264,7 @@ const Portfolio = () => {
             ].map(({ label, value, sub, color, tooltip }) => (
               <div
                 key={label}
-                className="p-5 rounded-lg border-2 border-border bg-card shadow-sm"
+                className="p-3 sm:p-5 rounded-lg border-2 border-border bg-card shadow-sm min-w-0"
               >
                 <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                   {label}
@@ -279,7 +279,7 @@ const Portfolio = () => {
                     </Tooltip>
                   )}
                 </p>
-                <p className={`text-2xl font-bold ${color || "text-foreground"}`}>{value}</p>
+                <p className={`text-lg sm:text-2xl font-bold break-all ${color || "text-foreground"}`}>{value}</p>
                 {sub && <p className={`text-xs mt-1 ${color || "text-muted-foreground"}`}>{sub}</p>}
               </div>
             ))}
@@ -287,7 +287,7 @@ const Portfolio = () => {
 
           {/* ── Holdings table ────────────────────────────────────────────── */}
           <div className="rounded-lg border-2 border-border bg-card shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border flex items-center justify-between">
               <h2 className="text-lg font-bold text-foreground">Holdings</h2>
               <span className="text-sm text-muted-foreground">
                 {holdings.length} position{holdings.length !== 1 ? "s" : ""}
@@ -306,7 +306,50 @@ const Portfolio = () => {
                 </Button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <>
+              {/* Phone: one compact card per holding, every number visible without sideways scrolling */}
+              <ul className="md:hidden divide-y divide-border">
+                {holdings.map((h) => (
+                  <li key={h.ticker}>
+                    <Link
+                      to="/simulator"
+                      onClick={() => sessionStorage.setItem("timus_goto_ticker", h.ticker)}
+                      className="block px-4 py-3 active:bg-muted/40"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-bold text-foreground">{h.ticker}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {h.shares.toLocaleString()} sh @ ${fmt(h.avgCost)}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-semibold text-foreground">${fmt(h.marketValue)}</p>
+                          <p className={`text-xs font-semibold ${pnlColor(h.totalPnL)}`}>
+                            {pnlSign(h.totalPnL)}${fmt(Math.abs(h.totalPnL))} ({pnlSign(h.totalReturn)}{fmt(Math.abs(h.totalReturn))}%)
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-1.5 flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Price ${fmt(h.currentPrice)}</span>
+                        <span className={pnlColor(h.dayChange)}>
+                          Day {pnlSign(h.dayChange)}${fmt(Math.abs(h.dayChange))}
+                        </span>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+                <li className="px-4 py-3 bg-muted/20 flex items-center justify-between text-sm font-bold">
+                  <span className="text-foreground">Total Invested</span>
+                  <span className="text-right">
+                    <span className="text-foreground">${fmt(totalMarketValue)}</span>{" "}
+                    <span className={pnlColor(totalUnrealizedPnL)}>
+                      {pnlSign(totalUnrealizedPnL)}${fmt(Math.abs(totalUnrealizedPnL))}
+                    </span>
+                  </span>
+                </li>
+              </ul>
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border bg-muted/30">
@@ -426,6 +469,7 @@ const Portfolio = () => {
                   </tfoot>
                 </table>
               </div>
+              </>
             )}
           </div>
 
@@ -439,7 +483,7 @@ const Portfolio = () => {
 
             return (
               <div className="mt-6 rounded-lg border-2 border-border bg-card shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
+                <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
                   <h2 className="text-lg font-bold text-foreground">Order History</h2>
                   {/* Time filter */}
                   <div className="flex items-center gap-1 bg-muted/50 rounded-xl p-1">

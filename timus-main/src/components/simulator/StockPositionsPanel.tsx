@@ -43,17 +43,24 @@ export default function StockPositionsPanel({ positions, onSelectTicker }: Stock
 
   return (
     <div className="rounded-lg border-2 border-border bg-card shadow-lg overflow-hidden">
-      <div className="px-6 py-4 border-b border-border">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border">
         <h3 className="text-lg font-bold text-foreground">Stock Positions</h3>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/30">
-              {["Symbol", "Quantity", "Buying Price", "Live Price", "P&L"].map((h) => (
+              {[
+                { h: "Symbol", cls: "" },
+                { h: "Qty", cls: "" },
+                // Buying price is secondary on a phone — hide it so P&L stays on screen
+                { h: "Buying Price", cls: "hidden sm:table-cell" },
+                { h: "Live Price", cls: "" },
+                { h: "P&L", cls: "" },
+              ].map(({ h, cls }) => (
                 <th
                   key={h}
-                  className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide"
+                  className={`${cls} px-3 sm:px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide`}
                 >
                   {h}
                 </th>
@@ -67,7 +74,7 @@ export default function StockPositionsPanel({ positions, onSelectTicker }: Stock
               const pnl = live != null ? agg.shares * live - agg.shares * agg.avgCost : null;
               return (
                 <tr key={ticker} className="border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors">
-                  <td className="px-4 py-3">
+                  <td className="px-3 sm:px-4 py-3">
                     {/* Same click-to-trade pattern as Holdings / Open Positions */}
                     <button
                       onClick={() => onSelectTicker(ticker)}
@@ -76,11 +83,11 @@ export default function StockPositionsPanel({ positions, onSelectTicker }: Stock
                       {ticker}
                     </button>
                   </td>
-                  <td className="px-4 py-3 text-foreground">{agg.shares.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-foreground">${fmt(agg.avgCost)}</td>
-                  <td className="px-4 py-3 text-foreground">{live != null ? `$${fmt(live)}` : "—"}</td>
+                  <td className="px-3 sm:px-4 py-3 text-foreground">{agg.shares.toLocaleString()}</td>
+                  <td className="hidden sm:table-cell px-3 sm:px-4 py-3 text-foreground">${fmt(agg.avgCost)}</td>
+                  <td className="px-3 sm:px-4 py-3 text-foreground">{live != null ? `$${fmt(live)}` : "—"}</td>
                   <td
-                    className={`px-4 py-3 font-semibold ${
+                    className={`px-3 sm:px-4 py-3 font-semibold whitespace-nowrap ${
                       pnl == null ? "text-muted-foreground" : pnl >= 0 ? "text-success" : "text-destructive"
                     }`}
                   >

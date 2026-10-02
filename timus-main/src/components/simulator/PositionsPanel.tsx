@@ -15,7 +15,7 @@ const PositionsPanel = ({ positions, onClosePosition }: PositionsPanelProps) => 
   }, 0);
 
   return (
-    <div className="p-6 rounded-lg border-2 border-border bg-card shadow-lg">
+    <div className="p-4 sm:p-6 rounded-lg border-2 border-border bg-card shadow-lg">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-2xl font-bold text-foreground">Open Positions</h3>
         <div className="text-right">

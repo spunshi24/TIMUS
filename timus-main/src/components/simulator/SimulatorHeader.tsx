@@ -251,7 +251,7 @@ const SimulatorHeader = ({
                   totalPnL >= 0 ? "text-success" : "text-destructive"
                 }`}
               >
-                {totalPnL >= 0 ? "+" : ""}$
+                {totalPnL >= 0 ? "+" : "-"}$
                 {Math.abs(totalPnL).toLocaleString(undefined, {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,

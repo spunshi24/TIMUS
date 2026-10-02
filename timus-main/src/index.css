@@ -159,6 +159,29 @@ All colors MUST be HSL.
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* ── Mobile safety nets ───────────────────────────────────────────────
+     1. Stop iOS from inflating text after rotation.
+     2. Nothing may ever widen the page past the screen — a single stray wide
+        element is what forces phones into a zoomed-out "desktop" view.
+     3. iOS Safari zooms in on any focused input under 16px and doesn't zoom
+        back out; keep form controls at >=16px on phones. */
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+  @media (max-width: 767px) {
+    input,
+    select,
+    textarea {
+      font-size: max(16px, 1em);
+    }
+  }
 }
 
 @layer utilities {

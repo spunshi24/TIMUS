@@ -43,6 +43,14 @@ const PERIOD_PARAMS: Record<Period, string> = {
 };
 
 const CHART_W = 800;
+
+// 52,000,000 -> "52.00M" so the Volume cell fits on a phone
+function formatVolume(v: number): string {
+  if (v >= 1e9) return `${(v / 1e9).toFixed(2)}B`;
+  if (v >= 1e6) return `${(v / 1e6).toFixed(2)}M`;
+  if (v >= 1e3) return `${(v / 1e3).toFixed(1)}K`;
+  return v.toLocaleString();
+}
 const CHART_H = 380;
 const PADDING = 0.05;
 
@@ -193,7 +201,7 @@ const ChartPanel = ({ ticker, onPriceUpdate }: ChartPanelProps) => {
   const lineColor = isPositive ? "hsl(142, 76%, 36%)" : "hsl(0, 84%, 60%)";
 
   // ── Mouse hover on chart ───────────────────────────────────────────────────
-  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+  const handleMouseMove = (e: React.PointerEvent<SVGSVGElement>) => {
     if (prices.length < 2) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const xRatio = (e.clientX - rect.left) / rect.width;
@@ -207,8 +215,7 @@ const ChartPanel = ({ ticker, onPriceUpdate }: ChartPanelProps) => {
   if (loading) {
     return (
       <div
-        className="p-6 rounded-lg border-2 border-border bg-card shadow-lg flex items-center justify-center"
-        style={{ minHeight: 520 }}
+        className="p-4 sm:p-6 rounded-lg border-2 border-border bg-card shadow-lg flex items-center justify-center min-h-[360px] sm:min-h-[520px]"
       >
         <div className="flex items-center gap-3 text-muted-foreground">
           <Loader2 className="w-6 h-6 animate-spin" />
@@ -222,8 +229,7 @@ const ChartPanel = ({ ticker, onPriceUpdate }: ChartPanelProps) => {
   if (error) {
     return (
       <div
-        className="p-6 rounded-lg border-2 border-border bg-card shadow-lg flex items-center justify-center"
-        style={{ minHeight: 520 }}
+        className="p-4 sm:p-6 rounded-lg border-2 border-border bg-card shadow-lg flex items-center justify-center min-h-[360px] sm:min-h-[520px]"
       >
         <div className="text-center space-y-3">
           <AlertCircle className="w-10 h-10 text-destructive mx-auto" />
@@ -241,17 +247,17 @@ const ChartPanel = ({ ticker, onPriceUpdate }: ChartPanelProps) => {
   const hoverTime = hoverIndex !== null ? formatHoverTime(history[hoverIndex].time, period) : null;
 
   return (
-    <div className="p-6 rounded-lg border-2 border-border bg-card shadow-lg">
+    <div className="p-4 sm:p-6 rounded-lg border-2 border-border bg-card shadow-lg">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <div className="flex items-baseline gap-3 flex-wrap">
-            <h2 className="text-3xl font-bold text-foreground">{quote.ticker}</h2>
-            <span className="text-sm text-muted-foreground">{quote.name}</span>
+      <div className="flex items-start justify-between gap-2 mb-4 sm:mb-6">
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-x-3 gap-y-0.5 flex-wrap">
+            <h2 className="text-2xl sm:text-3xl font-bold text-foreground">{quote.ticker}</h2>
+            <span className="text-sm text-muted-foreground truncate max-w-full">{quote.name}</span>
           </div>
 
-          <div className="flex items-center gap-4 mt-2 flex-wrap">
+          <div className="flex items-center gap-x-4 gap-y-1 mt-2 flex-wrap">
             <span className="text-2xl font-bold text-foreground">
               {hoverPrice !== null
                 ? `$${hoverPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -259,7 +265,7 @@ const ChartPanel = ({ ticker, onPriceUpdate }: ChartPanelProps) => {
             </span>
             {hoverPrice === null && (
               <span
-                className={`flex items-center gap-1 text-lg font-semibold ${
+                className={`flex items-center gap-1 text-base sm:text-lg font-semibold ${
                   isPositive ? "text-success" : "text-destructive"
                 }`}
               >
@@ -301,7 +307,7 @@ const ChartPanel = ({ ticker, onPriceUpdate }: ChartPanelProps) => {
       </div>
 
       {/* ── Metrics strip ──────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-4">
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-2 sm:gap-3 mb-4">
         {[
           { label: "Beta",       value: quote.beta        != null ? quote.beta.toFixed(2)        : "N/A", color: "" },
           { label: "52W High",   value: quote.week52_high != null ? `$${quote.week52_high.toFixed(2)}` : "N/A", color: "text-success" },
@@ -310,7 +316,7 @@ const ChartPanel = ({ ticker, onPriceUpdate }: ChartPanelProps) => {
           { label: "P/E Ratio",  value: quote.pe_ratio    != null ? quote.pe_ratio.toFixed(2)    : "N/A", color: "" },
           { label: "Div Yield",  value: quote.dividend_yield != null && quote.dividend_yield > 0 ? `${quote.dividend_yield.toFixed(2)}%` : "N/A", color: "" },
         ].map(({ label, value, color }) => (
-          <div key={label} className="p-3 rounded bg-muted/50">
+          <div key={label} className="p-2 sm:p-3 rounded bg-muted/50 min-w-0">
             <p className="text-xs text-muted-foreground mb-1">{label}</p>
             <p className={`text-sm font-bold ${color || "text-foreground"}`}>{value}</p>
           </div>
@@ -336,7 +342,7 @@ const ChartPanel = ({ ticker, onPriceUpdate }: ChartPanelProps) => {
       </div>
 
       {/* ── Chart ──────────────────────────────────────────────────────────── */}
-      <div className="relative w-full overflow-hidden rounded-lg bg-muted/20 p-4">
+      <div className="relative w-full overflow-hidden rounded-lg bg-muted/20 p-2 sm:p-4">
         {/* History loading overlay */}
         {historyLoading && (
           <div className="absolute inset-0 bg-background/60 flex items-center justify-center z-10 rounded-lg">
@@ -347,10 +353,13 @@ const ChartPanel = ({ ticker, onPriceUpdate }: ChartPanelProps) => {
         {prices.length > 1 ? (
           <svg
             viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-            className="w-full h-auto"
-            style={{ minHeight: 280, cursor: "crosshair" }}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
+            className="w-full h-auto sm:min-h-[280px] touch-pan-y select-none"
+            style={{ cursor: "crosshair" }}
+            onPointerMove={handleMouseMove}
+            onPointerDown={handleMouseMove}
+            onPointerLeave={handleMouseLeave}
+            onPointerUp={(e) => { if (e.pointerType !== "mouse") handleMouseLeave(); }}
+            onPointerCancel={handleMouseLeave}
           >
             <defs>
               <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
@@ -419,7 +428,7 @@ const ChartPanel = ({ ticker, onPriceUpdate }: ChartPanelProps) => {
         ) : (
           <div
             className="flex items-center justify-center text-muted-foreground"
-            style={{ minHeight: 280 }}
+            style={{ minHeight: 200 }}
           >
             No chart data available for this period.
           </div>
@@ -427,14 +436,14 @@ const ChartPanel = ({ ticker, onPriceUpdate }: ChartPanelProps) => {
       </div>
 
       {/* ── OHLV strip ─────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-4 gap-3 mt-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mt-4">
         {[
           { label: "Open",   value: `$${quote.open.toFixed(2)}`,   color: "" },
           { label: "High",   value: `$${quote.high.toFixed(2)}`,   color: "text-success" },
           { label: "Low",    value: `$${quote.low.toFixed(2)}`,    color: "text-destructive" },
-          { label: "Volume", value: quote.volume?.toLocaleString() ?? "N/A", color: "" },
+          { label: "Volume", value: quote.volume != null ? formatVolume(quote.volume) : "N/A", color: "" },
         ].map(({ label, value, color }) => (
-          <div key={label} className="p-3 rounded bg-muted/50">
+          <div key={label} className="p-2 sm:p-3 rounded bg-muted/50 min-w-0">
             <p className="text-xs text-muted-foreground mb-1">{label}</p>
             <p className={`text-sm font-bold ${color || "text-foreground"}`}>{value}</p>
           </div>
